@@ -1,0 +1,18 @@
+[package]
+name = "crossfire"
+version = "0.1.0"
+authors = ["plan <plan@yunify.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+crossbeam = "0.7"
+async-trait = "0.1"
+
+[dev-dependencies]
+log = { version = "0.4"}
+stderrlog = "0.4.1"
+tokio = { version = "0.2", features = ["time", "sync", "rt-threaded"] }
+rand = "0.7.3"
+futures = "0.3"

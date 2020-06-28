@@ -5,6 +5,7 @@ use std::pin::Pin;
 use std::future::Future;
 use crate::channel::*;
 
+/// Receiver that dose not support async
 pub struct RxBlocking<T, S: MPSCShared> {
     recv: Receiver<T>,
     shared: Arc<S>,
@@ -20,13 +21,14 @@ impl <T, S: MPSCShared> Drop for RxBlocking<T, S> {
 impl <T, S: MPSCShared> RxBlocking <T, S> {
 
     #[inline]
-    pub fn new(recv: Receiver<T>, shared: Arc<S>) -> Self {
+    pub(crate) fn new(recv: Receiver<T>, shared: Arc<S>) -> Self {
         Self{
             recv: recv,
             shared: shared,
         }
     }
 
+    /// Receive a message while blocking the current thread.
     #[inline]
     pub fn recv(&self) -> Result<T, RecvError> {
         match self.recv.recv() {
@@ -38,6 +40,7 @@ impl <T, S: MPSCShared> RxBlocking <T, S> {
         }
     }
 
+    /// Try to receive a message
     #[inline]
     pub fn try_recv(&self) -> Result<T, TryRecvError> {
         match self.recv.try_recv() {
@@ -49,27 +52,35 @@ impl <T, S: MPSCShared> RxBlocking <T, S> {
         }
     }
 
+    /// Probe possible messages in the channel (not accurate)
     #[inline]
     pub fn len(&self) -> usize {
         self.recv.len()
     }
 
+    /// Whether there's message in the channel (not accurate)
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.recv.is_empty()
     }
 
+    /// Return a crossbeam Receiver, you should make sure to call on_recv() after receiving a
+    /// message
+    /// (If you know what you're doing)
     #[inline(always)]
     pub fn raw(&self) -> &Receiver<T> {
         &self.recv
     }
 
+    /// (If you know what you're doing)
     #[inline(always)]
     pub fn on_recv(&self) {
         self.shared.on_recv();
     }
 }
 
+
+/// Receiver that supports async
 pub struct RxFuture<T, S: MPSCShared> {
     recv: Receiver<T>,
     shared: Arc<S>,
@@ -85,13 +96,15 @@ impl <T, S: MPSCShared> Drop for RxFuture<T, S> {
 impl <T, S: MPSCShared> RxFuture <T, S> {
 
     #[inline]
-    pub fn new(recv: Receiver<T>, shared: Arc<S>) -> Self {
+    pub(crate) fn new(recv: Receiver<T>, shared: Arc<S>) -> Self {
         Self{
             recv: recv,
             shared: shared,
         }
     }
 
+    /// Receive a message while blocking the current thread. (If you know what you're
+    /// doing)
     #[inline]
     pub fn recv_blocking(&self) -> Result<T, RecvError> {
         match self.recv.recv() {
@@ -103,11 +116,13 @@ impl <T, S: MPSCShared> RxFuture <T, S> {
         }
     }
 
+    /// Generate a future object to receive a message
     #[inline(always)]
     pub fn make_recv_future<'a>(&'a self) -> ReceiveFuture<'a, T, S> {
         return ReceiveFuture{rx: &self, waker: None}
     }
 
+    /// Receive a message in async manner
     #[inline]
     pub async fn recv(&self) -> Result<T, RecvError> {
         match self.try_recv() {
@@ -121,6 +136,7 @@ impl <T, S: MPSCShared> RxFuture <T, S> {
         }
     }
 
+    /// Try receive a message
     #[inline]
     pub fn try_recv(&self) -> Result<T, TryRecvError> {
         match self.recv.try_recv() {
@@ -132,21 +148,25 @@ impl <T, S: MPSCShared> RxFuture <T, S> {
         }
     }
 
+    /// Probe possible messages in the channel (not accurate)
     #[inline]
     pub fn len(&self) -> usize {
         self.recv.len()
     }
 
+    /// Whether there's message in the channel (not accurate)
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.recv.is_empty()
     }
 
+    /// Returns count of tx / rx wakers stored in channel for debug purpose
     #[inline]
     pub fn get_waker_length(&self) -> (usize, usize) {
         return self.shared.get_waker_length();
     }
 
+    /// This is only useful when you're writing your own future
     #[inline]
     pub fn poll_item(&self, ctx: &mut Context, waker: &mut Option<LockedWaker>) -> Result<T, TryRecvError> {
         match self.recv.try_recv() {

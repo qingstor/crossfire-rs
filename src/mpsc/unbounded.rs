@@ -8,7 +8,8 @@ pub type RxUnbounded<T> = RxFuture<T, UnboundedSharedFuture>;
 pub type TxUnbounded<T> = TxBlocking<T, UnboundedSharedFuture>;
 
 
-// Sender will never block, so we use the same TxBlocking for threads
+/// Initiate a unbounded channel.
+/// Sender will never block, so we use the same TxBlocking for threads
 pub fn unbounded_future<T: Unpin>() -> (TxUnbounded<T>, RxUnbounded<T>) {
     let (tx, rx) = crossbeam::channel::unbounded();
     let shared = Arc::new(UnboundedSharedFuture::new());

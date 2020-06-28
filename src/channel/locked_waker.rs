@@ -83,7 +83,7 @@ impl LockedWaker {
     }
 
     #[inline(always)]
-    pub fn is_cancel(&self) -> bool {
+    pub fn is_canceled(&self) -> bool {
         self.0.waked.load(Ordering::Acquire)
     }
 

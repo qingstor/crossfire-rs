@@ -4,6 +4,7 @@ use super::tx::*;
 use super::rx::*;
 use crate::channel::*;
 
+/// Initiate a bounded channel that sender and receiver are async
 pub fn bounded_future_both<T: Unpin>(size: usize) -> (TxFuture<T, SharedFutureBoth>, RxFuture<T, SharedFutureBoth>) {
     let (tx, rx) = crossbeam::channel::bounded(size);
     let shared = Arc::new(SharedFutureBoth::new());
@@ -13,6 +14,7 @@ pub fn bounded_future_both<T: Unpin>(size: usize) -> (TxFuture<T, SharedFutureBo
     (tx_f, rx_f)
 }
 
+/// Initiate a bounded channel that sender is async, receiver is blocking
 pub fn bounded_tx_future_rx_blocking<T: Unpin>(size: usize) -> (TxFuture<T, SharedSenderFRecvB>, RxBlocking<T, SharedSenderFRecvB>) {
     let (tx, rx) = crossbeam::channel::bounded(size);
     let shared = Arc::new(SharedSenderFRecvB::new());
@@ -22,6 +24,7 @@ pub fn bounded_tx_future_rx_blocking<T: Unpin>(size: usize) -> (TxFuture<T, Shar
     (tx_f, rx_b)
 }
 
+/// Initiate a bounded channel that sender is blocking, receiver is sync
 pub fn bounded_tx_blocking_rx_future<T>(size: usize) -> (TxBlocking<T, SharedSenderBRecvF>, RxFuture<T, SharedSenderBRecvF>) {
     let (tx, rx) = crossbeam::channel::bounded(size);
     let shared = Arc::new(SharedSenderBRecvF::new());

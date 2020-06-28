@@ -1,3 +1,4 @@
+
 use crate::channel::*;
 use crossbeam::channel::{RecvError};
 use std::future::Future;
@@ -6,6 +7,68 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::mem::transmute;
 use std::cell::UnsafeCell;
+
+/// A selector for receiving the same type of message from different channel
+///
+/// Usage:
+///
+/// ```rust
+///
+///  use crossfire::mpmc;
+///  use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
+///  use tokio::time::{delay_for, Duration};
+///  use crossfire::channel::SelectSame;
+///
+///  let mut rt = tokio::runtime::Builder::new().threaded_scheduler().enable_all().build().unwrap();
+///  rt.block_on(async move {
+///      let (tx1, rx1) = mpmc::bounded_future_both::<i32>(3);
+///      let (tx2, rx2) = mpmc::bounded_future_both::<i32>(2);
+///
+///      let recv_count = Arc::new(AtomicUsize::new(0));
+///      let mut ths = Vec::new();
+///      for _j in 0..2 {
+///          let _rx1 = rx1.clone();
+///          let _rx2 = rx2.clone();
+///          let count = recv_count.clone();
+///          ths.push(tokio::task::spawn(async move {
+///              let sel = SelectSame::new();
+///              let _op1 = sel.add_recv(_rx1);
+///              let op2 = sel.add_recv(_rx2);
+///              loop {
+///                  match sel.select().await {
+///                      Ok(_i)=>{
+///                          count.fetch_add(1, Ordering::Relaxed);
+///                      },
+///                      Err(_e)=>break,
+///                  }
+///                  if let Some(_i) = sel.try_recv(op2) {
+///                      count.fetch_add(1, Ordering::Relaxed);
+///                  }
+///              }
+///              println!("rx done");
+///          }));
+///      }
+///      tokio::spawn(async move {
+///          for i in 0..1000i32 {
+///              let _ = tx1.send(i).await;
+///              delay_for(Duration::from_millis(1)).await;
+///          }
+///          for i in 1500..2500i32 {
+///              let _ = tx1.send(i).await;
+///          }
+///      });
+///      tokio::spawn(async move {
+///          for i in 1000..1010i32 {
+///              let _ = tx2.send(i).await;
+///          }
+///      });
+///      for th in ths {
+///          let _ = th.await;
+///      }
+///      assert_eq!(recv_count.load(Ordering::Relaxed), 2000 + 10);
+///  });
+///
+/// ```
 
 pub struct SelectSame<T>
 where
@@ -59,6 +122,7 @@ macro_rules! try_recv_poll {
         }
     }
 }
+
 
 impl<T> SelectSame<T>
 where

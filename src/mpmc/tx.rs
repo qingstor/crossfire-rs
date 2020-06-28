@@ -5,17 +5,10 @@ use std::pin::Pin;
 use std::future::Future;
 use crate::channel::*;
 
+/// Sender that dose not support async
 pub struct TxBlocking<T, S: MPMCShared> {
     sender: Sender<T>,
     shared: Arc<S>,
-}
-
-impl <T, S: MPMCShared> SenderInf for TxBlocking<T, S> {
-
-    #[inline]
-    fn is_empty(&self) -> bool {
-        self.sender.is_empty()
-    }
 }
 
 impl <T, S: MPMCShared> Clone for TxBlocking<T, S> {
@@ -40,7 +33,7 @@ impl <T, S: MPMCShared> Drop for TxBlocking<T, S> {
 impl<T, S: MPMCShared> TxBlocking<T, S> {
 
     #[inline]
-    pub fn new(sender: Sender<T>, shared: Arc<S>) -> Self {
+    pub(crate) fn new(sender: Sender<T>, shared: Arc<S>) -> Self {
         Self{
             sender: sender,
             shared: shared,
@@ -69,23 +62,23 @@ impl<T, S: MPMCShared> TxBlocking<T, S> {
         }
     }
 
+    /// Probe possible messages in the channel (not accurate)
     #[inline]
     pub fn len(&self) -> usize {
         self.sender.len()
     }
+
+    /// Whether there's message in the channel (not accurate)
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.sender.is_empty()
+    }
+
 }
 
 pub struct TxFuture<T, S: MPMCShared> {
     sender: Sender<T>,
     shared: Arc<S>,
-}
-
-impl <T, S: MPMCShared> SenderInf for TxFuture<T, S> {
-
-    #[inline]
-    fn is_empty(&self) -> bool {
-        self.sender.is_empty()
-    }
 }
 
 impl <T, S: MPMCShared> Clone for TxFuture<T, S> {
@@ -110,7 +103,7 @@ impl <T, S: MPMCShared> Drop for TxFuture<T, S> {
 impl <T: Unpin, S: MPMCShared> TxFuture<T, S> {
 
     #[inline]
-    pub fn new(sender: Sender<T>, shared: Arc<S>) -> Self {
+    pub(crate) fn new(sender: Sender<T>, shared: Arc<S>) -> Self {
         Self{
             sender: sender,
             shared: shared,
@@ -128,19 +121,22 @@ impl <T: Unpin, S: MPMCShared> TxFuture<T, S> {
         }
     }
 
-    // use outside async funtion, which may block the current thread
+
+    /// Send a message while blocking the current thread. (Used outside async context,
+    /// if you know what you're doing)
     #[inline]
     pub fn send_blocking(&self, item: T) -> Result<(), SendError<T>> {
         self.sender.send(item)
     }
 
+    /// Generate a future object that send a message
     #[inline(always)]
     pub fn make_send_future<'a>(&'a self, item: T) -> SendFuture<'a, T, S> {
         return SendFuture{tx: &self, item: Some(item), waker: None}
     }
 
     #[inline]
-    pub fn clear_send_wakers(&self, waker: LockedWaker) {
+    fn clear_send_wakers(&self, waker: LockedWaker) {
         self.shared.clear_send_wakers(waker);
     }
 
@@ -155,13 +151,20 @@ impl <T: Unpin, S: MPMCShared> TxFuture<T, S> {
         }
     }
 
+    /// Probe possible messages in the channel (not accurate)
     #[inline]
     pub fn len(&self) -> usize {
         self.sender.len()
     }
 
+    /// Whether there's message in the channel (not accurate)
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.sender.is_empty()
+    }
+
     #[inline(always)]
-    pub fn poll_send<'a>(&'a self, ctx: &'a mut Context, mut item: T, waker: &'a mut Option<LockedWaker>) -> Result<(), TrySendError<T>> {
+    fn poll_send<'a>(&'a self, ctx: &'a mut Context, mut item: T, waker: &'a mut Option<LockedWaker>) -> Result<(), TrySendError<T>> {
         match self.sender.try_send(item) {
             Err(TrySendError::Disconnected(t))=>{
                 if let Some(old_waker) = waker.take() {

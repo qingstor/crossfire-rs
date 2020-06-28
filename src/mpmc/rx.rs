@@ -5,6 +5,7 @@ use std::pin::Pin;
 use std::future::Future;
 use crate::channel::*;
 
+/// Receiver that dose not support async
 pub struct RxBlocking<T, S: MPMCShared> {
     recv: Receiver<T>,
     shared: Arc<S>,
@@ -32,7 +33,7 @@ impl <T, S: MPMCShared> Drop for RxBlocking<T, S> {
 impl <T, S: MPMCShared> RxBlocking <T, S> {
 
     #[inline]
-    pub fn new(recv: Receiver<T>, shared: Arc<S>) -> Self {
+    pub(crate) fn new(recv: Receiver<T>, shared: Arc<S>) -> Self {
         Self{
             recv: recv,
             shared: shared,
@@ -61,21 +62,27 @@ impl <T, S: MPMCShared> RxBlocking <T, S> {
         }
     }
 
+    /// Probe possible messages in the channel (not accurate)
     #[inline]
     pub fn len(&self) -> usize {
         self.recv.len()
     }
 
+    /// Whether there's message in the channel (not accurate)
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.recv.is_empty()
     }
 
+    /// Return a crossbeam Receiver, you should make sure to call on_recv() after receiving a
+    /// message
+    /// (If you know what you're doing)
     #[inline(always)]
     pub fn raw(&self) -> &Receiver<T> {
         &self.recv
     }
 
+    /// (If you know what you're doing)
     #[inline(always)]
     pub fn on_recv(&self) {
         self.shared.on_recv();
@@ -110,7 +117,7 @@ impl <T, S: MPMCShared> Drop for RxFuture<T, S> {
 impl <T, S: MPMCShared> RxFuture <T, S> {
 
     #[inline]
-    pub fn new(recv: Receiver<T>, shared: Arc<S>) -> Self {
+    pub(crate) fn new(recv: Receiver<T>, shared: Arc<S>) -> Self {
         Self{
             recv: recv,
             shared: shared,
@@ -130,6 +137,8 @@ impl <T, S: MPMCShared> RxFuture <T, S> {
         }
     }
 
+    /// Receive a message while blocking the current thread. (If you know what you're
+    /// doing)
     #[inline]
     pub fn recv_blocking(&self) -> Result<T, RecvError> {
         match self.recv.recv() {
@@ -141,8 +150,10 @@ impl <T, S: MPMCShared> RxFuture <T, S> {
         }
     }
 
+    /// Cleanup when waker need to be canceled inside the channel.
+    /// Use only when writing your own custom future.
     #[inline]
-    pub fn clear_recv_wakers(&self, waker: LockedWaker) {
+    fn clear_recv_wakers(&self, waker: LockedWaker) {
         self.shared.clear_recv_wakers(waker);
     }
 
@@ -157,28 +168,33 @@ impl <T, S: MPMCShared> RxFuture <T, S> {
         }
     }
 
+    /// Generate a future object that receive a message
     #[inline]
     pub fn make_recv_future<'a>(&'a self) -> ReceiveFuture<'a, T, S> {
         return ReceiveFuture{rx: &self, waker: None}
     }
 
+    /// Probe possible messages in the channel (not accurate)
     #[inline]
     pub fn len(&self) -> usize {
         self.recv.len()
     }
 
+    /// Whether there's message in the channel (not accurate)
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.recv.is_empty()
     }
 
+    /// Returns count of tx / rx wakers stored in channel for debug purpose
     #[inline]
     pub fn get_waker_length(&self) -> (usize, usize) {
         return self.shared.get_waker_length();
     }
 
+    /// This is only useful when you're writing your own future
     #[inline(always)]
-    pub fn poll_item(&self, ctx: &mut Context, waker: &mut Option<LockedWaker>) -> Result<T, TryRecvError> {
+    fn poll_item(&self, ctx: &mut Context, waker: &mut Option<LockedWaker>) -> Result<T, TryRecvError> {
         match self.recv.try_recv() {
             Err(e)=>{
                 if !e.is_empty() {

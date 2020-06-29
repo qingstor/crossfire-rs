@@ -260,7 +260,7 @@ macro_rules! close_tx_common {
             if $self.tx_count.fetch_sub(1, Ordering::Release) > 1 {
                 return;
             }
-            // wake all rx, since no one will wake blocked fauture after that
+            // wake all rx, since no one will wake blocked future after that
             loop {
                 match $self.recv_waker.pop() {
                     Ok(waker)=>{
@@ -281,7 +281,7 @@ macro_rules! close_rx_common {
             if $self.rx_count.fetch_sub(1, Ordering::Release) > 1 {
                 return;
             }
-            // wake all tx, since no one will wake blocked fauture after that
+            // wake all tx, since no one will wake blocked future after that
             loop {
                 match $self.sender_waker.pop() {
                     Ok(waker)=>{

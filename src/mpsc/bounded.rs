@@ -323,7 +323,7 @@ mod tests {
     #[test]
     fn bench_future_both_performance() {
         println!();
-        let mut rt = tokio::runtime::Builder::new().threaded_scheduler().enable_all().threaded_scheduler().enable_all().core_threads(2).build().unwrap();
+        let mut rt = tokio::runtime::Builder::new().threaded_scheduler().enable_all().core_threads(2).build().unwrap();
         rt.block_on(async move {
             let total_message = 1000000;
             let (tx, rx) = bounded_future_both::<i32>(100);
@@ -352,7 +352,7 @@ mod tests {
     #[test]
     fn bench_tx_blocking_rx_future_performance() {
         println!();
-        let mut rt = tokio::runtime::Builder::new().threaded_scheduler().enable_all().threaded_scheduler().enable_all().core_threads(1).build().unwrap();
+        let mut rt = tokio::runtime::Builder::new().threaded_scheduler().enable_all().core_threads(1).build().unwrap();
         let total_message = 1000000;
         let (tx, rx_f) = bounded_tx_blocking_rx_future::<i32>(100);
         let start = Instant::now();
@@ -375,7 +375,7 @@ mod tests {
     #[test]
     fn bench_tx_future_rx_blocking_performance() {
         println!();
-        let mut rt = tokio::runtime::Builder::new().threaded_scheduler().enable_all().threaded_scheduler().enable_all().core_threads(1).build().unwrap();
+        let mut rt = tokio::runtime::Builder::new().threaded_scheduler().enable_all().core_threads(1).build().unwrap();
         let total_message = 1000000;
         let (tx_f, rx) = bounded_tx_future_rx_blocking::<i32>(100);
         let start = Instant::now();
@@ -400,7 +400,7 @@ mod tests {
     #[test]
     fn bench_tokio_mpsc_performance() {
         println!();
-        let mut rt = tokio::runtime::Builder::new().threaded_scheduler().enable_all().threaded_scheduler().enable_all().core_threads(2).build().unwrap();
+        let mut rt = tokio::runtime::Builder::new().threaded_scheduler().enable_all().core_threads(2).build().unwrap();
         rt.block_on(async move {
             let total_message = 1000000;
             let (tx, mut rx) = tokio::sync::mpsc::channel::<i32>(100);
@@ -428,7 +428,7 @@ mod tests {
 
     #[test]
     fn test_future_both_1_thread_single() {
-        let mut rt = tokio::runtime::Builder::new().threaded_scheduler().enable_all().threaded_scheduler().enable_all().core_threads(1).build().unwrap();
+        let mut rt = tokio::runtime::Builder::new().threaded_scheduler().enable_all().core_threads(1).build().unwrap();
         rt.block_on(async move {
             let (tx, rx) = bounded_future_both::<i32>(10);
             let rx_res = rx.try_recv();
@@ -470,7 +470,7 @@ mod tests {
 
     #[test]
     fn test_tx_blocking_rx_future_background() {
-        let mut rt = tokio::runtime::Builder::new().threaded_scheduler().enable_all().threaded_scheduler().enable_all().core_threads(1).build().unwrap();
+        let mut rt = tokio::runtime::Builder::new().threaded_scheduler().enable_all().core_threads(1).build().unwrap();
 
         let (tx, rx) = bounded_tx_blocking_rx_future::<i32>(1);
         thread::spawn(move || {
@@ -504,7 +504,7 @@ mod tests {
 
     #[test]
     fn test_tx_blocking_rx_future_1_thread_single() {
-        let mut rt = tokio::runtime::Builder::new().threaded_scheduler().enable_all().threaded_scheduler().enable_all().core_threads(1).build().unwrap();
+        let mut rt = tokio::runtime::Builder::new().threaded_scheduler().enable_all().core_threads(1).build().unwrap();
         rt.block_on(async move {
             let (tx, rx) = bounded_tx_blocking_rx_future::<i32>(10);
             let rx_res = rx.try_recv();
@@ -547,7 +547,7 @@ mod tests {
 
     #[test]
     fn test_tx_future_rx_blocking_1_thread_single() {
-        let mut rt = tokio::runtime::Builder::new().threaded_scheduler().enable_all().threaded_scheduler().enable_all().core_threads(1).build().unwrap();
+        let mut rt = tokio::runtime::Builder::new().threaded_scheduler().enable_all().core_threads(1).build().unwrap();
         rt.block_on(async move {
             let (tx, rx) = bounded_tx_future_rx_blocking::<i32>(10);
             let rx_res = rx.try_recv();
@@ -605,7 +605,7 @@ mod tests {
 
     fn _future_both_thread_multi(real_threads: usize, tx_count: usize) {
         let rx_count = 1usize;
-        let mut rt = tokio::runtime::Builder::new().threaded_scheduler().enable_all().threaded_scheduler().enable_all().core_threads(real_threads).build().unwrap();
+        let mut rt = tokio::runtime::Builder::new().threaded_scheduler().enable_all().core_threads(real_threads).build().unwrap();
         rt.block_on(async move {
             let (tx, rx) = bounded_future_both::<i32>(10);
             let (noti_tx, mut noti_rx) = tokio::sync::mpsc::channel::<usize>(tx_count + rx_count);
@@ -653,7 +653,7 @@ mod tests {
     }
 
     fn _tx_blocking_rx_future_multi(real_threads: usize, tx_count: usize) {
-        let mut rt = tokio::runtime::Builder::new().threaded_scheduler().enable_all().threaded_scheduler().enable_all().core_threads(real_threads).build().unwrap();
+        let mut rt = tokio::runtime::Builder::new().threaded_scheduler().enable_all().core_threads(real_threads).build().unwrap();
         let (tx, rx) = bounded_tx_blocking_rx_future::<i32>(10);
         let counter = Arc::new(AtomicI32::new(0));
         let round = 100000;
@@ -706,7 +706,7 @@ mod tests {
     }
 
     fn _tx_future_rx_blocking_multi(real_threads: usize, tx_count: usize) {
-        let mut rt = tokio::runtime::Builder::new().threaded_scheduler().enable_all().threaded_scheduler().enable_all().core_threads(real_threads).build().unwrap();
+        let mut rt = tokio::runtime::Builder::new().threaded_scheduler().enable_all().core_threads(real_threads).build().unwrap();
         let (tx, rx) = bounded_tx_future_rx_blocking::<i32>(10);
         let counter = Arc::new(AtomicI32::new(0));
         let round = 100000;

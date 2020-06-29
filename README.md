@@ -1,5 +1,17 @@
 # Crossfire
 
+[![Build Status](https://github.com/qingstor/crossfire-rs/workflows/Rust/badge.svg)](
+https://github.com/qingstor/crossfire-rs/actions)
+[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](
+https://github.com/qignstor/crossfire-rs#license)
+[![Cargo](https://img.shields.io/crates/v/crossfire.svg)](
+https://crates.io/crates/crossfire)
+[![Documentation](https://docs.rs/crossfire/badge.svg)](
+https://docs.rs/crossfire)
+[![Rust 1.36+](https://img.shields.io/badge/rust-1.36+-lightgray.svg)](
+https://www.rust-lang.org)
+
+
 This crate provide channels used between async-async or async-blocking code, in all direction.
 Implmented with lockless in mind, low level is based on crossbeam-channel
 

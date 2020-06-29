@@ -1,8 +1,17 @@
 [package]
 name = "crossfire"
 version = "0.1.0"
-authors = ["plan <plan@yunify.com>"]
+authors = ["plan <frostyplanet@gmail.com>"]
 edition = "2018"
+license = "Apache-2.0"
+homepage = "https://github.com/qingstor/crossfire-rs"
+readme = "README.md"
+repository = "https://github.com/qingstor/crossfire-rs"
+documentation = "https://docs.rs/crossfire"
+keywords = ["async", "non-blocking", "lock-free", "channel"]
+categories = ["concurrency", "data-structures"]
+exclude = ["/ci/*", "/bors.toml"]
+description = "channels for async and threads"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

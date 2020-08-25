@@ -73,6 +73,7 @@
 extern crate crossbeam;
 #[macro_use]
 extern crate async_trait;
+extern crate futures;
 
 #[macro_use]
 pub mod channel;

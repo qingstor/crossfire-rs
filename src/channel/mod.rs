@@ -1,5 +1,7 @@
 mod locked_waker;
 mod select;
+mod stream;
+pub use stream::Stream;
 pub use select::SelectSame;
 pub use locked_waker::*;
 use std::task::Context;

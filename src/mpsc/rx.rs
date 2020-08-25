@@ -229,6 +229,11 @@ impl <T, S: MPSCShared> RxFuture <T, S> {
         }
     }
 
+    pub fn into_stream(self) -> Stream<T, Self>
+        where T: Sync + Send + Unpin + 'static
+    {
+        Stream::new(self)
+    }
 }
 
 #[async_trait]

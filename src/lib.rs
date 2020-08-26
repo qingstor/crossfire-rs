@@ -54,12 +54,12 @@
 //!
 //! mpmc & mpsc package is almost the same, while mpsc has some optimization becauses it assumes only one consumer.
 //!
-//! Error types are re-exposed from crossbeam-channel.
+//! Error types are re-exported from crossbeam-channel.
 //!
 //! ## Compatibility
 //!
 //! Supports stable Rust. Mainly tested on tokio-0.2 (Not tried on async-std or other runtime).
-//! future::select and timeout work fine, but it takes advantage of runtime behavior not documented by Rust official.
+//! future::selects and timeout work fine, but it takes advantage of runtime behavior not documented by Rust official.
 //!
 //! Refer to https://github.com/rust-lang/rust/issues/73002
 //!
@@ -67,7 +67,7 @@
 //! While using mp tx or mp rx, there's memory overhead to pass along wakers for pending async producer or consumer.
 //! Since waker is small, the overhead can be ignored if your channel is busy.
 //! Canceled wakers will be eventually cleanup by later send/receive event.
-//! If the channel is used for close notification (which never trigger),
+//! If the channel is used for close notification (which never trigger) in combine with futures::select,
 //! currently there's hard coded threshold to clean up those canceled wakers.
 
 extern crate crossbeam;

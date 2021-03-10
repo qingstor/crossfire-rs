@@ -76,6 +76,9 @@ impl<T, S: MPMCShared> TxBlocking<T, S> {
 
 }
 
+unsafe impl<T: Send, S: MPMCShared> Send for TxBlocking<T, S> {}
+unsafe impl<T: Send, S: MPMCShared> Sync for TxBlocking<T, S> {}
+
 pub struct TxFuture<T, S: MPMCShared> {
     sender: Sender<T>,
     shared: Arc<S>,

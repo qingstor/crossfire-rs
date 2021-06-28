@@ -77,7 +77,7 @@ macro_rules! clear_sender_wakers_common {
             if $self.send_waker_rx_seq.load(Ordering::Acquire) + limit >= $seq {
                 return;
             }
-            if !$self.checking_sender.compare_and_swap(false, true, Ordering::Acquire) {
+            if !$self.checking_sender.swap(true, Ordering::SeqCst) {
                 let mut ok = true;
                 while ok {
                     if let Ok(waker) = $self.sender_waker.pop() {
@@ -110,7 +110,7 @@ macro_rules! clear_recv_wakers_common {
             if $self.recv_waker_rx_seq.load(Ordering::Acquire) + limit >= $seq {
                 return;
             }
-            if !$self.checking_recv.compare_and_swap(false, true, Ordering::Acquire) {
+            if !$self.checking_recv.swap(true, Ordering::SeqCst) {
                 let mut ok = true;
                 while ok {
                     if let Ok(waker) = $self.recv_waker.pop() {

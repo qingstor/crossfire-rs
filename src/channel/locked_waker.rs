@@ -64,10 +64,10 @@ impl LockedWaker {
         if _self.waked.load(Ordering::Relaxed) {
             return true
         }
-        while _self.locked.compare_and_swap(false, true, Ordering::SeqCst) {
+        while _self.locked.swap(true, Ordering::SeqCst) {
             spin_loop_hint();
         }
-        let r = _self.waked.compare_and_swap(false, true, Ordering::SeqCst);
+        let r = _self.waked.swap(true, Ordering::SeqCst);
         _self.locked.store(false, Ordering::Release);
         r
     }
@@ -90,10 +90,10 @@ impl LockedWaker {
     #[inline]
     pub(crate) fn wake(&self) -> bool {
         let _self = self.0.as_ref();
-        while _self.locked.compare_and_swap(false, true, Ordering::SeqCst) {
+        while _self.locked.swap(true, Ordering::SeqCst) {
             spin_loop_hint();
         }
-        if _self.waked.compare_and_swap(false, true, Ordering::SeqCst) == false {
+        if _self.waked.swap(true, Ordering::SeqCst) == false {
             let waker: &mut Option<Waker> = unsafe{transmute(_self.waker.get())};
             if let Some(_waker) = waker.take() {
                 _waker.wake();

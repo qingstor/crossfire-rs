@@ -276,6 +276,57 @@ mod tests {
     use std::sync::atomic::{AtomicI32, Ordering};
 
 
+    struct ChannelDrop {
+        tx: TxFuture<Msg, SharedFutureBoth>,
+        rx: RxFuture<Msg, SharedFutureBoth>,
+    }
+
+    impl Drop for ChannelDrop {
+        fn drop(&mut self) {
+            println!("ChannelDrop is dropping");
+            loop {
+                if let Ok(msg) = self.rx.try_recv() {
+                    println!("recv {}", msg.i);
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+
+    struct Msg {
+        i: usize,
+    }
+
+    impl Drop for Msg {
+        fn drop(&mut self) {
+            println!("droping {:?}", self.i);
+        }
+    }
+
+    #[test]
+    fn test_drop() {
+        println!();
+        let mut rt = tokio::runtime::Builder::new().threaded_scheduler().enable_all().core_threads(2).build().unwrap();
+        rt.block_on(async move {
+            let tx = {
+                let (tx, rx) = bounded_future_both::<Msg>(100);
+                let c = ChannelDrop{tx, rx};
+                c.tx.send(Msg{i: 1}).await.expect("ok");
+                c.tx.send(Msg{i: 2}).await.expect("ok");
+                c.tx.send(Msg{i: 3}).await.expect("ok");
+                let _tx = c.tx.clone();
+                _tx
+            };
+            {
+                println!("try to send after rx dropped");
+                assert!(tx.send(Msg{i: 4}).await.is_err());
+                drop(tx);
+                println!("dropped tx");
+            }
+        });
+    }
+
     #[test]
     fn bench_std_sync_channel_performance() {
         println!();

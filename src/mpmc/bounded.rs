@@ -86,12 +86,12 @@ impl MPMCShared for SharedFutureBoth {
 
     #[inline(always)]
     fn add_tx(&self) {
-        let _ = self.tx_count.fetch_add(1, Ordering::Acquire);
+        let _ = self.tx_count.fetch_add(1, Ordering::SeqCst);
     }
 
     #[inline(always)]
     fn add_rx(&self) {
-        let _ = self.rx_count.fetch_add(1, Ordering::Acquire);
+        let _ = self.rx_count.fetch_add(1, Ordering::SeqCst);
     }
 
     #[inline]
@@ -167,12 +167,12 @@ impl MPMCShared for SharedSenderBRecvF {
 
     #[inline]
     fn add_tx(&self) {
-        self.tx_count.fetch_add(1, Ordering::Acquire);
+        self.tx_count.fetch_add(1, Ordering::SeqCst);
     }
 
     #[inline]
     fn add_rx(&self) {
-        self.rx_count.fetch_add(1, Ordering::Acquire);
+        self.rx_count.fetch_add(1, Ordering::SeqCst);
     }
 
     #[inline]
@@ -182,7 +182,7 @@ impl MPMCShared for SharedSenderBRecvF {
 
     #[inline]
     fn close_rx(&self) {
-        self.rx_count.fetch_sub(1, Ordering::Release);
+        self.rx_count.fetch_sub(1, Ordering::SeqCst);
     }
 
     #[inline]
@@ -243,17 +243,17 @@ impl MPMCShared for SharedSenderFRecvB {
 
     #[inline]
     fn add_tx(&self) {
-        self.tx_count.fetch_add(1, Ordering::Acquire);
+        self.tx_count.fetch_add(1, Ordering::SeqCst);
     }
 
     #[inline]
     fn add_rx(&self) {
-        self.rx_count.fetch_add(1, Ordering::Acquire);
+        self.rx_count.fetch_add(1, Ordering::SeqCst);
     }
 
     #[inline]
     fn close_tx(&self) {
-        self.tx_count.fetch_sub(1, Ordering::Release);
+        self.tx_count.fetch_sub(1, Ordering::SeqCst);
     }
 
     #[inline]
@@ -638,7 +638,7 @@ mod tests {
                     'A: loop {
                         match _rx.recv().await {
                             Ok(_i) =>{
-                                _counter.as_ref().fetch_add(1i32, Ordering::Relaxed);
+                                _counter.as_ref().fetch_add(1i32, Ordering::SeqCst);
                                 //print!("recv {} {}\r", _rx_i, i);
                             },
                             Err(_)=>break 'A,
@@ -674,7 +674,7 @@ mod tests {
             let _send_msg = send_msg.clone();
             tx_ths.push(thread::spawn(move || {
                 loop {
-                    let i = _send_msg.fetch_add(1, Ordering::Relaxed);
+                    let i = _send_msg.fetch_add(1, Ordering::SeqCst);
                     if i >= round {
                         break;
                     }
@@ -700,7 +700,7 @@ mod tests {
                     'A: loop {
                         match _rx.recv().await {
                             Ok(_i) =>{
-                                _counter.as_ref().fetch_add(1i32, Ordering::Relaxed);
+                                _counter.as_ref().fetch_add(1i32, Ordering::SeqCst);
                                 //println!("rx {} {}\r", _rx_i, _i);
                             },
                             Err(_)=>break 'A,
@@ -755,7 +755,7 @@ mod tests {
                 'A: loop {
                     match _rx.recv() {
                         Ok(_) =>{
-                            _counter.as_ref().fetch_add(1i32, Ordering::Relaxed);
+                            _counter.as_ref().fetch_add(1i32, Ordering::SeqCst);
                             //print!("{} {}\r", _rx_i, i);
                         },
                         Err(_)=>break 'A,

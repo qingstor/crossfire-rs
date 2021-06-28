@@ -85,7 +85,7 @@ impl MPSCShared for SharedFutureBoth {
 
     #[inline(always)]
     fn add_tx(&self) {
-        let _ = self.tx_count.fetch_add(1, Ordering::Acquire);
+        let _ = self.tx_count.fetch_add(1, Ordering::SeqCst);
     }
 
     #[inline]
@@ -155,7 +155,7 @@ impl MPSCShared for SharedSenderBRecvF {
 
     #[inline]
     fn add_tx(&self) {
-        self.tx_count.fetch_add(1, Ordering::Acquire);
+        self.tx_count.fetch_add(1, Ordering::SeqCst);
     }
 
     #[inline]
@@ -165,7 +165,7 @@ impl MPSCShared for SharedSenderBRecvF {
 
     #[inline]
     fn close_rx(&self) {
-        let _ = self.rx_count.fetch_sub(1, Ordering::Release);
+        let _ = self.rx_count.fetch_sub(1, Ordering::SeqCst);
     }
 
     #[inline]
@@ -225,17 +225,17 @@ impl MPSCShared for SharedSenderFRecvB {
 
     #[inline]
     fn add_tx(&self) {
-        let _ = self.tx_count.fetch_add(1, Ordering::Acquire);
+        let _ = self.tx_count.fetch_add(1, Ordering::SeqCst);
     }
 
     #[inline]
     fn close_tx(&self) {
-        let _ = self.tx_count.fetch_sub(1, Ordering::Release);
+        let _ = self.tx_count.fetch_sub(1, Ordering::SeqCst);
     }
 
     #[inline]
     fn close_rx(&self) {
-        if self.rx_count.fetch_sub(1, Ordering::Release) > 1 {
+        if self.rx_count.fetch_sub(1, Ordering::SeqCst) > 1 {
             return;
         }
         // wake all tx, since no one will wake blocked fauture after that
@@ -274,6 +274,7 @@ mod tests {
     use std::thread;
     use tokio::time::delay_for;
     use std::sync::atomic::{AtomicI32, Ordering};
+
 
     #[test]
     fn bench_std_sync_channel_performance() {
@@ -634,7 +635,7 @@ mod tests {
             'A: loop {
                 match rx.recv().await {
                     Ok(_) =>{
-                        _counter.as_ref().fetch_add(1i32, Ordering::Relaxed);
+                        _counter.as_ref().fetch_add(1i32, Ordering::SeqCst);
                         //print!("{}\n",  i);
                     },
                     Err(_)=>break 'A,
@@ -677,7 +678,7 @@ mod tests {
             'A: loop {
                 match rx.recv().await {
                     Ok(_) =>{
-                        counter.as_ref().fetch_add(1i32, Ordering::Relaxed);
+                        counter.as_ref().fetch_add(1i32, Ordering::SeqCst);
                         //print!("{} {}\r", _rx_i, i);
                     },
                     Err(_)=>break 'A,
@@ -716,7 +717,7 @@ mod tests {
             'A: loop {
                 match rx.recv() {
                     Ok(_) =>{
-                        _counter.as_ref().fetch_add(1i32, Ordering::Relaxed);
+                        _counter.as_ref().fetch_add(1i32, Ordering::SeqCst);
                         //print!("{} {}\r", _rx_i, i);
                     },
                     Err(_)=>break 'A,

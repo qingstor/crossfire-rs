@@ -37,12 +37,12 @@ use std::cell::UnsafeCell;
 ///              loop {
 ///                  match sel.select().await {
 ///                      Ok(_i)=>{
-///                          count.fetch_add(1, Ordering::Relaxed);
+///                          count.fetch_add(1, Ordering::SeqCst);
 ///                      },
 ///                      Err(_e)=>break,
 ///                  }
 ///                  if let Some(_i) = sel.try_recv(op2) {
-///                      count.fetch_add(1, Ordering::Relaxed);
+///                      count.fetch_add(1, Ordering::SeqCst);
 ///                  }
 ///              }
 ///              println!("rx done");
@@ -370,13 +370,13 @@ mod tests {
                         match sel.select().await {
                             Ok(_i)=>{
                                 //println!("{} recv {}", _j, _i);
-                                count.fetch_add(1, Ordering::Relaxed);
+                                count.fetch_add(1, Ordering::SeqCst);
                             },
                             Err(_e)=>break,
                         }
                         if let Some(_i) = sel.try_recv(op2) {
                             //println!("{} try recv {}", _j, _i);
-                            count.fetch_add(1, Ordering::Relaxed);
+                            count.fetch_add(1, Ordering::SeqCst);
                         }
                     }
                     println!("rx done");

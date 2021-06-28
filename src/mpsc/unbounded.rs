@@ -58,7 +58,7 @@ impl MPSCShared for UnboundedSharedFuture {
 
     #[inline(always)]
     fn add_tx(&self) {
-        let _ = self.tx_count.fetch_add(1, Ordering::Acquire);
+        let _ = self.tx_count.fetch_add(1, Ordering::SeqCst);
     }
 
     #[inline]
@@ -206,13 +206,13 @@ mod tests {
             'A: loop {
                 match rx.recv().await {
                     Ok(_) =>{
-                        counter.as_ref().fetch_add(1i32, Ordering::Relaxed);
+                        counter.as_ref().fetch_add(1i32, Ordering::SeqCst);
                         //print!("{} {}\r", _rx_i, i);
                     },
                     Err(_)=>break 'A,
                 }
             }
-            assert_eq!(counter.as_ref().load(Ordering::Relaxed), round * (tx_count as i32));
+            assert_eq!(counter.as_ref().load(Ordering::Acquire), round * (tx_count as i32));
         });
         for th in tx_ths {
             let _ = th.join();

@@ -188,9 +188,7 @@ impl <T, S: MPSCShared> RxFuture <T, S> {
             Ok(item)=>{
                 self.shared.on_recv();
                 if let Some(old_waker) = waker.take() {
-                    if old_waker.is_waked() {
-                        old_waker.abandon();
-                    }
+                    old_waker.abandon();
                 }
                 return Ok(item)
             }

@@ -185,9 +185,7 @@ impl <T: Unpin, S: MPMCShared> TxFuture<T, S> {
             Ok(())=>{
                 self.shared.on_send();
                 if let Some(old_waker) = waker.take() {
-                    if !old_waker.is_waked() {
-                        old_waker.abandon();
-                    }
+                    old_waker.abandon();
                 }
                 return Ok(());
             },

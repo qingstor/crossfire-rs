@@ -3,6 +3,7 @@ use crossbeam::queue::{ArrayQueue, SegQueue};
 use super::tx::*;
 use super::rx::*;
 use crate::channel::*;
+use std::task::*;
 
 /// Initiate a bounded channel that sender and receiver are async
 pub fn bounded_future_both<T: Unpin>(size: usize) -> (TxFuture<T, SharedFutureBoth>, RxFuture<T, SharedFutureBoth>) {
@@ -74,13 +75,13 @@ impl MPSCShared for SharedFutureBoth {
     }
 
     #[inline]
-    fn reg_recv(&self) -> Option<LockedWaker> {
-        reg_recv_s!(self)
+    fn reg_recv(&self, ctx: &mut Context) -> Option<LockedWaker> {
+        reg_recv_s!(self, ctx)
     }
 
     #[inline]
-    fn reg_send(&self) -> Option<LockedWaker> {
-        reg_send_m!(self)
+    fn reg_send(&self, ctx: &mut Context) -> Option<LockedWaker> {
+        reg_send_m!(self, ctx)
     }
 
     #[inline(always)]
@@ -144,12 +145,12 @@ impl MPSCShared for SharedSenderBRecvF {
     }
 
     #[inline]
-    fn reg_recv(&self) -> Option<LockedWaker> {
-        reg_recv_s!(self)
+    fn reg_recv(&self, ctx: &mut Context) -> Option<LockedWaker> {
+        reg_recv_s!(self, ctx)
     }
 
     #[inline]
-    fn reg_send(&self) -> Option<LockedWaker> {
+    fn reg_send(&self, _ctx: &mut Context) -> Option<LockedWaker> {
         None
     }
 
@@ -214,13 +215,13 @@ impl MPSCShared for SharedSenderFRecvB {
     }
 
     #[inline]
-    fn reg_recv(&self) -> Option<LockedWaker> {
+    fn reg_recv(&self, _ctx: &mut Context) -> Option<LockedWaker> {
         return None
     }
 
     #[inline]
-    fn reg_send(&self) -> Option<LockedWaker> {
-        reg_send_m!(self)
+    fn reg_send(&self, ctx: &mut Context) -> Option<LockedWaker> {
+        reg_send_m!(self, ctx)
     }
 
     #[inline]

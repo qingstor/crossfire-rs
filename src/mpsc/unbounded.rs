@@ -1,5 +1,6 @@
 use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
 use crossbeam::queue::ArrayQueue;
+use std::task::*;
 use super::tx::*;
 use super::rx::*;
 use crate::channel::*;
@@ -47,12 +48,12 @@ impl MPSCShared for UnboundedSharedFuture {
         on_send_s!(self)
     }
 
-    fn reg_recv(&self) -> Option<LockedWaker> {
-        reg_recv_s!(self)
+    fn reg_recv(&self, ctx: &mut Context) -> Option<LockedWaker> {
+        reg_recv_s!(self, ctx)
     }
 
     #[inline]
-    fn reg_send(&self) -> Option<LockedWaker> {
+    fn reg_send(&self, _ctx: &mut Context) -> Option<LockedWaker> {
         None
     }
 

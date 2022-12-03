@@ -3,6 +3,7 @@ use crossbeam::queue::SegQueue;
 use super::tx::*;
 use super::rx::*;
 use crate::channel::*;
+use std::task::*;
 
 pub type RxUnbounded<T> = RxFuture<T, UnboundedSharedFuture>;
 pub type TxUnbounded<T> = TxBlocking<T, UnboundedSharedFuture>;
@@ -51,12 +52,12 @@ impl MPMCShared for UnboundedSharedFuture {
     }
 
     #[inline]
-    fn reg_recv(&self) -> Option<LockedWaker> {
-        reg_recv_m!(self)
+    fn reg_recv(&self, ctx: &mut Context) -> Option<LockedWaker> {
+        reg_recv_m!(self, ctx)
     }
 
     #[inline]
-    fn reg_send(&self) -> Option<LockedWaker> {
+    fn reg_send(&self, _ctx: &mut Context) -> Option<LockedWaker> {
         None
     }
 

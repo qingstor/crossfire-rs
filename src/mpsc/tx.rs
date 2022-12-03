@@ -192,7 +192,7 @@ impl <T: Unpin, S: MPSCShared> TxFuture<T, S> {
                 return Ok(());
             },
         }
-        if let Some(_waker) = self.shared.reg_send() {
+        if let Some(_waker) = self.shared.reg_send(ctx) {
             match self.sender.try_send(item) {
                 Ok(())=>{
                     self.shared.on_send();
@@ -202,7 +202,7 @@ impl <T: Unpin, S: MPSCShared> TxFuture<T, S> {
                     return Ok(());
                 },
                 Err(TrySendError::Full(t))=>{
-                    _waker.commit(ctx);
+                    _waker.commit();
                     waker.replace(_waker);
                     return Err(TrySendError::Full(t));
                 },

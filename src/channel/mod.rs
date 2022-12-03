@@ -12,8 +12,8 @@ pub trait MPMCShared: Sync + Send {
     fn new() -> Self;
     fn on_recv(&self);
     fn on_send(&self);
-    fn reg_recv(&self) -> Option<LockedWaker>;
-    fn reg_send(&self) -> Option<LockedWaker>;
+    fn reg_recv(&self, _ctx: &mut Context) -> Option<LockedWaker>;
+    fn reg_send(&self, _ctx: &mut Context) -> Option<LockedWaker>;
     fn add_tx(&self);
     fn add_rx(&self);
     fn close_tx(&self);
@@ -37,8 +37,8 @@ pub trait MPSCShared: Sync + Send {
     fn on_recv(&self);
     fn on_send(&self);
     fn cancel_recv_reg(&self);
-    fn reg_recv(&self) -> Option<LockedWaker>;
-    fn reg_send(&self) -> Option<LockedWaker>;
+    fn reg_recv(&self, _ctx: &mut Context) -> Option<LockedWaker>;
+    fn reg_send(&self, _ctx: &mut Context) -> Option<LockedWaker>;
     fn add_tx(&self);
     fn close_tx(&self);
     fn close_rx(&self);
@@ -134,10 +134,10 @@ macro_rules! clear_recv_wakers_common {
 }
 
 macro_rules! reg_send_m {
-    ($self: expr) => {
+    ($self: expr, $ctx: expr) => {
         {
             let seq = $self.send_waker_tx_seq.fetch_add(1, Ordering::SeqCst);
-            let waker = LockedWaker::new(true, seq);
+            let waker = LockedWaker::new($ctx, seq);
             let _ = $self.sender_waker.push(waker.weak());
             if $self.rx_count.load(Ordering::SeqCst) == 0 {
                 // XXX atomic order?
@@ -151,10 +151,10 @@ macro_rules! reg_send_m {
 }
 
 macro_rules! reg_recv_s {
-    ($self: expr) => {
+    ($self: expr, $ctx: expr) => {
         {
 
-            let waker = LockedWaker::new(true, 0);
+            let waker = LockedWaker::new($ctx, 0);
             let _ = $self.recv_waker.push(waker.weak());
             if $self.tx_count.load(Ordering::SeqCst) == 0 {
                 // no one is sending
@@ -169,10 +169,10 @@ macro_rules! reg_recv_s {
 
 
 macro_rules! reg_recv_m {
-    ($self: expr) => {
+    ($self: expr, $ctx: expr) => {
         {
             let seq = $self.recv_waker_tx_seq.fetch_add(1, Ordering::SeqCst);
-            let waker = LockedWaker::new(true, seq);
+            let waker = LockedWaker::new($ctx, seq);
             let _ = $self.recv_waker.push(waker.weak());
             if $self.tx_count.load(Ordering::SeqCst) == 0 {
                 // no one is sending

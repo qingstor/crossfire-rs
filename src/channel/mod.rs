@@ -80,7 +80,7 @@ macro_rules! clear_sender_wakers_common {
             if !$self.checking_sender.swap(true, Ordering::SeqCst) {
                 let mut ok = true;
                 while ok {
-                    if let Ok(waker) = $self.sender_waker.pop() {
+                    if let Some(waker) = $self.sender_waker.pop() {
                         ok = $self.send_waker_rx_seq.fetch_add(1, Ordering::SeqCst) + limit < $seq;
                         if let Some(real_waker) = waker.upgrade() {
                             if !real_waker.is_canceled() {
@@ -113,7 +113,7 @@ macro_rules! clear_recv_wakers_common {
             if !$self.checking_recv.swap(true, Ordering::SeqCst) {
                 let mut ok = true;
                 while ok {
-                    if let Ok(waker) = $self.recv_waker.pop() {
+                    if let Some(waker) = $self.recv_waker.pop() {
                         ok = $self.recv_waker_rx_seq.fetch_add(1, Ordering::SeqCst) + limit < $seq;
                         if let Some(real_waker) = waker.upgrade() {
                             if !real_waker.is_canceled() {
@@ -189,50 +189,30 @@ macro_rules! on_recv_m {
     ($self: expr) => {
         {
             loop {
-                match $self.sender_waker.pop() {
-                    Ok(waker)=>{
-                        let _seq = $self.send_waker_rx_seq.fetch_add(1, Ordering::SeqCst);
-                        if waker.wake() {
-                            return;
-                        }
-                    },
-                    Err(_)=>return,
+                if let Some(waker) = $self.sender_waker.pop() {
+                    let _seq = $self.send_waker_rx_seq.fetch_add(1, Ordering::SeqCst);
+                    if waker.wake() {
+                        return;
+                    }
+                } else {
+                    return;
                 }
             }
         }
     }
 }
 
-//macro_rules! on_recv_s {
-//    ($self: expr) => {
-//        {
-//            loop {
-//                match $self.sender_waker.pop() {
-//                    Ok(waker)=>{
-//                        if waker.wake() {
-//                            return;
-//                        }
-//                    },
-//                    Err(_)=>return,
-//                }
-//            }
-//        }
-//    }
-//}
-
-
 macro_rules! on_send_m {
     ($self: expr) => {
         {
             loop {
-                match $self.recv_waker.pop() {
-                    Ok(waker)=>{
-                        let _seq = $self.recv_waker_rx_seq.fetch_add(1, Ordering::SeqCst);
-                        if waker.wake() {
-                            return;
-                        }
-                    },
-                    Err(_)=>return,
+                if let Some(waker) = $self.recv_waker.pop() {
+                    let _seq = $self.recv_waker_rx_seq.fetch_add(1, Ordering::SeqCst);
+                    if waker.wake() {
+                        return;
+                    }
+                } else {
+                    return;
                 }
             }
         }
@@ -243,13 +223,12 @@ macro_rules! on_send_s {
     ($self: expr) => {
         {
             loop {
-                match $self.recv_waker.pop() {
-                    Ok(waker)=>{
-                        if waker.wake() {
-                            return;
-                        }
-                    },
-                    Err(_)=>return,
+                if let Some(waker) = $self.recv_waker.pop() {
+                    if waker.wake() {
+                        return;
+                    }
+                } else {
+                   return;
                 }
             }
         }
@@ -264,13 +243,10 @@ macro_rules! close_tx_common {
             }
             // wake all rx, since no one will wake blocked future after that
             loop {
-                match $self.recv_waker.pop() {
-                    Ok(waker)=>{
-                        waker.wake();
-                    },
-                    Err(_)=>{
-                        return;
-                    }
+                if let Some(waker) = $self.recv_waker.pop() {
+                    waker.wake();
+                } else {
+                    return;
                 }
             }
         }
@@ -285,11 +261,10 @@ macro_rules! close_rx_common {
             }
             // wake all tx, since no one will wake blocked future after that
             loop {
-                match $self.sender_waker.pop() {
-                    Ok(waker)=>{
-                        waker.wake();
-                    },
-                    Err(_)=>return,
+                if let Some(waker) = $self.sender_waker.pop() {
+                    waker.wake();
+                } else {
+                    return;
                 }
             }
         }

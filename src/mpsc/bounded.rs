@@ -241,11 +241,10 @@ impl MPSCShared for SharedSenderFRecvB {
         }
         // wake all tx, since no one will wake blocked fauture after that
         loop {
-            match self.sender_waker.pop() {
-                Ok(waker)=>{
-                    waker.wake();
-                },
-                Err(_)=>return,
+            if let Some(waker) = self.sender_waker.pop() {
+                waker.wake();
+            } else {
+                return;
             }
         }
     }

@@ -1,13 +1,15 @@
-use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
-use crossbeam::queue::ArrayQueue;
-use std::task::*;
-use super::tx::*;
 use super::rx::*;
+use super::tx::*;
 use crate::channel::*;
+use crossbeam::queue::ArrayQueue;
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
+};
+use std::task::*;
 
 pub type RxUnbounded<T> = RxFuture<T, UnboundedSharedFuture>;
 pub type TxUnbounded<T> = TxBlocking<T, UnboundedSharedFuture>;
-
 
 /// Initiate a unbounded channel.
 /// Sender will never block, so we use the same TxBlocking for threads
@@ -19,7 +21,6 @@ pub fn unbounded_future<T: Unpin>() -> (TxUnbounded<T>, RxUnbounded<T>) {
     let rx_f = RxFuture::new(rx, shared);
     (tx_f, rx_f)
 }
-
 
 pub struct UnboundedSharedFuture {
     tx_count: AtomicUsize,
@@ -33,15 +34,11 @@ impl MPSCShared for UnboundedSharedFuture {
     }
 
     fn new() -> Self {
-        Self{
-            recv_waker: ArrayQueue::new(1),
-            tx_count: AtomicUsize::new(1),
-        }
+        Self { recv_waker: ArrayQueue::new(1), tx_count: AtomicUsize::new(1) }
     }
 
     #[inline]
-    fn on_recv(&self) {
-    }
+    fn on_recv(&self) {}
 
     #[inline]
     fn on_send(&self) {
@@ -68,8 +65,7 @@ impl MPSCShared for UnboundedSharedFuture {
     }
 
     #[inline]
-    fn close_rx(&self) {
-    }
+    fn close_rx(&self) {}
 
     #[inline]
     fn get_tx_count(&self) -> usize {
@@ -82,9 +78,9 @@ mod tests {
 
     extern crate tokio;
     use super::*;
-    use std::time::Instant;
-    use std::thread;
     use std::sync::atomic::{AtomicI32, Ordering};
+    use std::thread;
+    use std::time::Instant;
 
     #[test]
     fn bench_std_channel_performance() {
@@ -95,7 +91,7 @@ mod tests {
         thread::spawn(move || {
             let _tx = tx.clone();
             for i in 0..total_message {
-              let _ = _tx.send(i);
+                let _ = _tx.send(i);
             }
         });
 
@@ -126,14 +122,21 @@ mod tests {
         }
         let end = Instant::now();
 
-        println!("{} message, single sender thread single receiver thread use crossbeam::channel, {} /s",
-                 total_message, (total_message as f64) / end.duration_since(start).as_secs_f64());
+        println!(
+            "{} message, single sender thread single receiver thread use crossbeam::channel, {} /s",
+            total_message,
+            (total_message as f64) / end.duration_since(start).as_secs_f64()
+        );
     }
 
     #[test]
     fn bench_tokio_mpsc_performance() {
         println!();
-        let rt = tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_all().build().unwrap();
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_all()
+            .build()
+            .unwrap();
         rt.block_on(async move {
             let total_message = 1000000;
             let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<i32>();
@@ -177,13 +180,20 @@ mod tests {
             }
             let end = Instant::now();
 
-            println!("{} message, single sender thread single receiver thread use mpmc {} /s",
-                     total_message, (total_message as f64) / end.duration_since(start).as_secs_f64());
+            println!(
+                "{} message, single sender thread single receiver thread use mpmc {} /s",
+                total_message,
+                (total_message as f64) / end.duration_since(start).as_secs_f64()
+            );
         });
     }
 
     fn _tx_blocking_rx_future_multi(real_threads: usize, tx_count: usize) {
-        let rt = tokio::runtime::Builder::new_multi_thread().worker_threads(real_threads).enable_all().build().unwrap();
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(real_threads)
+            .enable_all()
+            .build()
+            .unwrap();
         let (tx, rx) = unbounded_future::<i32>();
         let counter = Arc::new(AtomicI32::new(0));
         let round = 100000;
@@ -192,10 +202,10 @@ mod tests {
             let _tx = tx.clone();
             let _round = round;
             tx_ths.push(thread::spawn(move || {
-                for i in 0i32.._round  {
+                for i in 0i32.._round {
                     match _tx.send(i) {
-                        Err(e)=>panic!("{}", e),
-                        _=>{},
+                        Err(e) => panic!("{}", e),
+                        _ => {}
                     }
                 }
                 println!("tx {} exit", _tx_i);
@@ -203,14 +213,13 @@ mod tests {
         }
         drop(tx);
         rt.block_on(async move {
-
             'A: loop {
                 match rx.recv().await {
-                    Ok(_) =>{
+                    Ok(_) => {
                         counter.as_ref().fetch_add(1i32, Ordering::SeqCst);
                         //print!("{} {}\r", _rx_i, i);
-                    },
-                    Err(_)=>break 'A,
+                    }
+                    Err(_) => break 'A,
                 }
             }
             assert_eq!(counter.as_ref().load(Ordering::Acquire), round * (tx_count as i32));

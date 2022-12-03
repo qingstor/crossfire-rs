@@ -1,12 +1,11 @@
-
 use crate::channel::*;
-use crossbeam::channel::{RecvError};
-use std::future::Future;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::pin::Pin;
-use std::task::{Context, Poll};
-use std::mem::transmute;
+use crossbeam::channel::RecvError;
 use std::cell::UnsafeCell;
+use std::future::Future;
+use std::mem::transmute;
+use std::pin::Pin;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::task::{Context, Poll};
 
 /// A selector for receiving the same type of message from different channel
 ///
@@ -83,54 +82,42 @@ where
     phan: std::marker::PhantomData<T>,
 }
 
-unsafe impl<T> Send for SelectSame<T>
-where
-    T: Sync + Send + Unpin + 'static {
-}
+unsafe impl<T> Send for SelectSame<T> where T: Sync + Send + Unpin + 'static {}
 
-unsafe impl<T> Sync for SelectSame<T>
-where
-    T: Sync + Send + Unpin + 'static {
-}
-
+unsafe impl<T> Sync for SelectSame<T> where T: Sync + Send + Unpin + 'static {}
 
 macro_rules! try_recv_poll {
-
-    ($self: expr, $index: expr, $rx: expr, $ctx: expr, $wakers: expr) => {
-        {
-            let has_waker = $wakers[$index].is_some();
-            let r = $rx.poll_item($ctx, &mut $wakers[$index]);
-            drop($rx);
-            match r {
-                Ok(r) => {
-                    $self.last_index.store($index, Ordering::Relaxed);
-                    if $wakers[$index].is_none() && has_waker {
-                        $self.has_waker.fetch_sub(1, Ordering::Relaxed);
+    ($self: expr, $index: expr, $rx: expr, $ctx: expr, $wakers: expr) => {{
+        let has_waker = $wakers[$index].is_some();
+        let r = $rx.poll_item($ctx, &mut $wakers[$index]);
+        drop($rx);
+        match r {
+            Ok(r) => {
+                $self.last_index.store($index, Ordering::Relaxed);
+                if $wakers[$index].is_none() && has_waker {
+                    $self.has_waker.fetch_sub(1, Ordering::Relaxed);
+                }
+                return Poll::Ready(Ok(r));
+            }
+            Err(e) => {
+                if e.is_empty() {
+                    if $wakers[$index].is_some() && !has_waker {
+                        $self.has_waker.fetch_add(1, Ordering::Relaxed);
                     }
-                    return Poll::Ready(Ok(r));
-                },
-                Err(e) => {
-                    if e.is_empty() {
-                        if $wakers[$index].is_some() && !has_waker {
-                            $self.has_waker.fetch_add(1, Ordering::Relaxed);
-                        }
-                    } else {
-                        $self.close_handler($index);
-                    }
-                },
+                } else {
+                    $self.close_handler($index);
+                }
             }
         }
-    }
+    }};
 }
-
 
 impl<T> SelectSame<T>
 where
     T: Sync + Send + Unpin + 'static,
 {
-
     pub fn new() -> Self {
-        Self{
+        Self {
             size: AtomicUsize::new(0),
             handles: UnsafeCell::new(Vec::new()),
             wakers: UnsafeCell::new(Vec::new()),
@@ -143,12 +130,12 @@ where
 
     #[inline(always)]
     fn get_handles(&self) -> &mut Vec<Option<Box<dyn AsyncRx<T>>>> {
-        unsafe{transmute(self.handles.get())}
+        unsafe { transmute(self.handles.get()) }
     }
 
     #[inline(always)]
     fn get_wakers(&self) -> &mut Vec<Option<LockedWaker>> {
-        unsafe{transmute(self.wakers.get())}
+        unsafe { transmute(self.wakers.get()) }
     }
 
     pub fn add_recv<Rx: AsyncRx<T> + 'static>(&self, rx: Rx) -> usize {
@@ -162,7 +149,8 @@ where
     fn close_handler(&self, index: usize) {
         self.get_handles()[index] = None;
         self.left_handles.fetch_sub(1, Ordering::Relaxed);
-        let _ = self.last_index.compare_exchange_weak(index, 0, Ordering::Relaxed, Ordering::Relaxed);
+        let _ =
+            self.last_index.compare_exchange_weak(index, 0, Ordering::Relaxed, Ordering::Relaxed);
         let wakers = self.get_wakers();
         if wakers[index].is_some() {
             wakers[index] = None;
@@ -178,15 +166,15 @@ where
                 Ok(r) => {
                     self.last_index.store(index, Ordering::Relaxed);
                     return Some(r);
-                },
+                }
                 Err(e) => {
                     if !e.is_empty() {
                         self.close_handler(index);
                     }
-                },
+                }
             }
         }
-        return None
+        return None;
     }
 
     #[inline(always)]
@@ -213,9 +201,9 @@ where
     }
 
     pub async fn select(&self) -> Result<T, RecvError> {
-        let r = SelectSameFuture{selector: self}.await;
+        let r = SelectSameFuture { selector: self }.await;
         self.cleanup_wakers();
-        return r
+        return r;
     }
 }
 
@@ -223,14 +211,13 @@ struct SelectSameFuture<'a, T>
 where
     T: Sync + Send + Unpin + 'static,
 {
-    selector: &'a SelectSame<T>
+    selector: &'a SelectSame<T>,
 }
 
 impl<'a, T> Future for SelectSameFuture<'a, T>
 where
     T: Sync + Send + Unpin + 'static,
 {
-
     type Output = Result<T, RecvError>;
 
     #[inline]
@@ -239,7 +226,7 @@ where
         let handles = _self.get_handles();
         let wakers = _self.get_wakers();
         if _self.left_handles.load(Ordering::Relaxed) == 0 {
-            return Poll::Ready(Err(RecvError{}));
+            return Poll::Ready(Err(RecvError {}));
         }
         let mut polled_last_index: Option<usize> = None;
         let mut polled_waked: Option<usize> = None;
@@ -259,7 +246,7 @@ where
                 }
             }
             if _self.left_handles.load(Ordering::Relaxed) == 0 {
-                return Poll::Ready(Err(RecvError{}));
+                return Poll::Ready(Err(RecvError {}));
             }
         }
         // Try last one first if no wakers
@@ -273,7 +260,7 @@ where
             }
         }
         if _self.left_handles.load(Ordering::Relaxed) == 0 {
-            return Poll::Ready(Err(RecvError{}));
+            return Poll::Ready(Err(RecvError {}));
         }
         // Check any thing left without wakers
         {
@@ -288,9 +275,9 @@ where
             }
         }
         if _self.left_handles.load(Ordering::Relaxed) == 0 {
-            return Poll::Ready(Err(RecvError{}));
+            return Poll::Ready(Err(RecvError {}));
         }
-        return Poll::Pending
+        return Poll::Pending;
     }
 }
 
@@ -298,14 +285,18 @@ where
 mod tests {
 
     use super::*;
-    use std::sync::Arc;
-    use crate::mpsc;
     use crate::mpmc;
+    use crate::mpsc;
+    use std::sync::Arc;
     use tokio::time::Duration;
 
     #[test]
     fn test_select_same_mpsc() {
-        let rt = tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_all().build().unwrap();
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_all()
+            .build()
+            .unwrap();
         rt.block_on(async move {
             let (tx1, rx1) = mpsc::bounded_future_both::<i32>(3);
             let (tx2, rx2) = mpsc::bounded_future_both::<i32>(2);
@@ -337,9 +328,9 @@ mod tests {
             });
             loop {
                 match sel.select().await {
-                    Ok(_i)=>{ // println!("recv {}", i);
-                    },
-                    Err(_e)=>break,
+                    Ok(_i) => { // println!("recv {}", i);
+                    }
+                    Err(_e) => break,
                 }
                 if let Some(_i) = sel.try_recv(op2) {
                     //println!("recv {}", _i)
@@ -350,7 +341,11 @@ mod tests {
 
     #[test]
     fn test_select_same_mpmc() {
-        let rt = tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_all().build().unwrap();
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_all()
+            .build()
+            .unwrap();
         rt.block_on(async move {
             let (tx1, rx1) = mpmc::bounded_future_both::<i32>(3);
             let (tx2, rx2) = mpmc::bounded_future_both::<i32>(2);
@@ -367,11 +362,11 @@ mod tests {
                     let op2 = sel.add_recv(_rx2);
                     loop {
                         match sel.select().await {
-                            Ok(_i)=>{
+                            Ok(_i) => {
                                 //println!("{} recv {}", _j, _i);
                                 count.fetch_add(1, Ordering::SeqCst);
-                            },
-                            Err(_e)=>break,
+                            }
+                            Err(_e) => break,
                         }
                         if let Some(_i) = sel.try_recv(op2) {
                             //println!("{} try recv {}", _j, _i);
@@ -406,5 +401,4 @@ mod tests {
             assert_eq!(recv_count.load(Ordering::Relaxed), 2000 + 10);
         });
     }
-
 }

@@ -1,7 +1,10 @@
-use std::sync::{Arc, Weak, atomic::{AtomicBool, Ordering}};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc, Weak,
+};
 use std::task::*;
 
-pub struct LockedWaker (Arc<LockedWakerInner>);
+pub struct LockedWaker(Arc<LockedWakerInner>);
 
 struct LockedWakerInner {
     locked: AtomicBool,
@@ -16,14 +19,13 @@ impl Clone for LockedWaker {
     }
 }
 
-pub struct LockedWakerRef (Weak<LockedWakerInner>);
+pub struct LockedWakerRef(Weak<LockedWakerInner>);
 
 impl LockedWaker {
-
     #[inline(always)]
     pub(crate) fn new(ctx: &Context, seq: u64) -> Self {
-        let s = Arc::new(LockedWakerInner{
-            seq: seq,
+        let s = Arc::new(LockedWakerInner {
+            seq,
             locked: AtomicBool::new(true), // initial locked
             waker: ctx.waker().clone(),
             waked: AtomicBool::new(false),
@@ -52,7 +54,7 @@ impl LockedWaker {
     pub(crate) fn abandon(&self) -> bool {
         let _self = self.0.as_ref();
         if _self.waked.load(Ordering::Relaxed) {
-            return true
+            return true;
         }
         while _self.locked.swap(true, Ordering::SeqCst) {
             std::hint::spin_loop();
@@ -89,18 +91,17 @@ impl LockedWaker {
             return true;
         }
         _self.locked.store(false, Ordering::Release);
-        return false
+        return false;
     }
 }
 
 impl LockedWakerRef {
-
     #[inline(always)]
     pub(crate) fn wake(&self) -> bool {
         if let Some(_self) = self.0.upgrade() {
-            return LockedWaker(_self).wake()
+            return LockedWaker(_self).wake();
         } else {
-            return false
+            return false;
         }
     }
 
@@ -109,9 +110,9 @@ impl LockedWakerRef {
             if _self.waked.load(Ordering::Acquire) {
                 return None;
             }
-            return Some(LockedWaker(_self))
+            return Some(LockedWaker(_self));
         }
-        return None
+        return None;
     }
 }
 

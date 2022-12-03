@@ -1,12 +1,17 @@
-use std::sync::{Arc, atomic::{AtomicUsize, AtomicU64, AtomicBool, Ordering}};
-use crossbeam::queue::SegQueue;
-use super::tx::*;
 use super::rx::*;
+use super::tx::*;
 use crate::channel::*;
+use crossbeam::queue::SegQueue;
+use std::sync::{
+    atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
+    Arc,
+};
 use std::task::*;
 
 /// Initiate a bounded channel that sender and receiver are async
-pub fn bounded_future_both<T: Unpin>(size: usize) -> (TxFuture<T, SharedFutureBoth>, RxFuture<T, SharedFutureBoth>) {
+pub fn bounded_future_both<T: Unpin>(
+    size: usize,
+) -> (TxFuture<T, SharedFutureBoth>, RxFuture<T, SharedFutureBoth>) {
     let (tx, rx) = crossbeam::channel::bounded(size);
     let shared = Arc::new(SharedFutureBoth::new());
 
@@ -16,7 +21,9 @@ pub fn bounded_future_both<T: Unpin>(size: usize) -> (TxFuture<T, SharedFutureBo
 }
 
 /// Initiate a bounded channel that sender is async, receiver is blocking
-pub fn bounded_tx_future_rx_blocking<T: Unpin>(size: usize) -> (TxFuture<T, SharedSenderFRecvB>, RxBlocking<T, SharedSenderFRecvB>) {
+pub fn bounded_tx_future_rx_blocking<T: Unpin>(
+    size: usize,
+) -> (TxFuture<T, SharedSenderFRecvB>, RxBlocking<T, SharedSenderFRecvB>) {
     let (tx, rx) = crossbeam::channel::bounded(size);
     let shared = Arc::new(SharedSenderFRecvB::new());
 
@@ -26,7 +33,9 @@ pub fn bounded_tx_future_rx_blocking<T: Unpin>(size: usize) -> (TxFuture<T, Shar
 }
 
 /// Initiate a bounded channel that sender is blocking, receiver is sync
-pub fn bounded_tx_blocking_rx_future<T>(size: usize) -> (TxBlocking<T, SharedSenderBRecvF>, RxFuture<T, SharedSenderBRecvF>) {
+pub fn bounded_tx_blocking_rx_future<T>(
+    size: usize,
+) -> (TxBlocking<T, SharedSenderBRecvF>, RxFuture<T, SharedSenderBRecvF>) {
     let (tx, rx) = crossbeam::channel::bounded(size);
     let shared = Arc::new(SharedSenderBRecvF::new());
 
@@ -49,9 +58,8 @@ pub struct SharedFutureBoth {
 }
 
 impl MPMCShared for SharedFutureBoth {
-
     fn new() -> Self {
-        Self{
+        Self {
             sender_waker: SegQueue::new(),
             recv_waker: SegQueue::new(),
             tx_count: AtomicUsize::new(1),
@@ -135,9 +143,8 @@ pub struct SharedSenderBRecvF {
 }
 
 impl MPMCShared for SharedSenderBRecvF {
-
     fn new() -> Self {
-        Self{
+        Self {
             recv_waker: SegQueue::new(),
             tx_count: AtomicUsize::new(1),
             rx_count: AtomicUsize::new(1),
@@ -148,8 +155,7 @@ impl MPMCShared for SharedSenderBRecvF {
     }
 
     #[inline]
-    fn on_recv(&self) {
-    }
+    fn on_recv(&self) {}
 
     #[inline]
     fn on_send(&self) {
@@ -211,9 +217,8 @@ pub struct SharedSenderFRecvB {
 }
 
 impl MPMCShared for SharedSenderFRecvB {
-
     fn new() -> Self {
-        Self{
+        Self {
             sender_waker: SegQueue::new(),
             rx_count: AtomicUsize::new(1),
             tx_count: AtomicUsize::new(1),
@@ -229,8 +234,7 @@ impl MPMCShared for SharedSenderFRecvB {
     }
 
     #[inline]
-    fn on_send(&self) {
-    }
+    fn on_send(&self) {}
 
     #[inline]
     fn reg_recv(&self, _ctx: &mut Context) -> Option<LockedWaker> {
@@ -277,16 +281,15 @@ impl MPMCShared for SharedSenderFRecvB {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
 
     extern crate tokio;
     use super::*;
-    use std::time::{Instant, Duration};
-    use std::thread;
-    use tokio::time::{timeout};
     use std::sync::atomic::{AtomicI32, Ordering};
+    use std::thread;
+    use std::time::{Duration, Instant};
+    use tokio::time::timeout;
 
     #[test]
     fn bench_std_sync_channel_performance() {
@@ -297,7 +300,7 @@ mod tests {
         thread::spawn(move || {
             let _tx = tx.clone();
             for i in 0..total_message {
-              let _ = _tx.send(i);
+                let _ = _tx.send(i);
             }
         });
 
@@ -328,14 +331,21 @@ mod tests {
         }
         let end = Instant::now();
 
-        println!("{} message, single sender thread single receiver thread use crossbeam::channel, {} /s",
-                 total_message, (total_message as f64) / end.duration_since(start).as_secs_f64());
+        println!(
+            "{} message, single sender thread single receiver thread use crossbeam::channel, {} /s",
+            total_message,
+            (total_message as f64) / end.duration_since(start).as_secs_f64()
+        );
     }
 
     #[test]
     fn bench_future_both_performance() {
         println!();
-        let rt = tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_all().build().unwrap();
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_all()
+            .build()
+            .unwrap();
         rt.block_on(async move {
             let total_message = 1000000;
             let (tx, rx) = bounded_future_both::<i32>(100);
@@ -356,8 +366,11 @@ mod tests {
             }
             let end = Instant::now();
 
-            println!("{} message, single sender thread single receiver thread use mpmc {} /s",
-                     total_message, (total_message as f64) / end.duration_since(start).as_secs_f64());
+            println!(
+                "{} message, single sender thread single receiver thread use mpmc {} /s",
+                total_message,
+                (total_message as f64) / end.duration_since(start).as_secs_f64()
+            );
         });
     }
 
@@ -379,8 +392,11 @@ mod tests {
             }
             let end = Instant::now();
 
-            println!("{} message, single sender thread single receiver thread use mpmc {} /s",
-                     total_message, (total_message as f64) / end.duration_since(start).as_secs_f64());
+            println!(
+                "{} message, single sender thread single receiver thread use mpmc {} /s",
+                total_message,
+                (total_message as f64) / end.duration_since(start).as_secs_f64()
+            );
         });
     }
 
@@ -394,17 +410,19 @@ mod tests {
         let th = thread::spawn(move || {
             for _i in 0..total_message {
                 let _r = rx.recv();
-//                assert_eq!(r.unwrap(), i);
+                //                assert_eq!(r.unwrap(), i);
             }
             let end = Instant::now();
-            println!("{} message, single sender thread single receiver thread use mpmc {} /s",
-                     total_message, (total_message as f64) / end.duration_since(start).as_secs_f64());
+            println!(
+                "{} message, single sender thread single receiver thread use mpmc {} /s",
+                total_message,
+                (total_message as f64) / end.duration_since(start).as_secs_f64()
+            );
         });
         rt.block_on(async move {
             for i in 0i32..total_message {
                 let _ = tx_f.send(i).await;
             }
-
         });
         let _ = th.join();
     }
@@ -412,7 +430,11 @@ mod tests {
     #[test]
     fn bench_tokio_mpsc_performance() {
         println!();
-        let rt = tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_all().build().unwrap();
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_all()
+            .build()
+            .unwrap();
         rt.block_on(async move {
             let total_message = 1000000;
             let (tx, mut rx) = tokio::sync::mpsc::channel::<i32>(100);
@@ -453,7 +475,7 @@ mod tests {
                 match rx.recv().await {
                     Ok(_) => {
                         recv_msg_count += 1;
-                    },
+                    }
                     Err(_) => {
                         break;
                     }
@@ -481,15 +503,15 @@ mod tests {
 
             let (noti_tx, noti_rx) = tokio::sync::oneshot::channel::<bool>();
             tokio::spawn(async move {
-                for i in 0i32..12  {
+                for i in 0i32..12 {
                     match rx.recv().await {
-                        Ok(j)=>{
+                        Ok(j) => {
                             println!("recv {}", i);
                             assert_eq!(i, j);
-                        },
-                        Err(e)=>{
+                        }
+                        Err(e) => {
                             panic!("error {}", e);
-                        },
+                        }
                     }
                 }
                 let res = rx.recv().await;
@@ -507,7 +529,11 @@ mod tests {
 
     #[test]
     fn test_tx_blocking_rx_future_1_thread_single() {
-        let rt = tokio::runtime::Builder::new_multi_thread().enable_all().worker_threads(1).build().unwrap();
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .worker_threads(1)
+            .build()
+            .unwrap();
         rt.block_on(async move {
             let (tx, rx) = bounded_tx_blocking_rx_future::<i32>(10);
             let rx_res = rx.try_recv();
@@ -523,15 +549,15 @@ mod tests {
 
             let (noti_tx, noti_rx) = tokio::sync::oneshot::channel::<bool>();
             tokio::spawn(async move {
-                for i in 0i32..12  {
+                for i in 0i32..12 {
                     match rx.recv().await {
-                        Ok(j)=>{
+                        Ok(j) => {
                             println!("recv {}", i);
                             assert_eq!(i, j);
-                        },
-                        Err(e)=>{
+                        }
+                        Err(e) => {
                             panic!("error {}", e);
-                        },
+                        }
                     }
                 }
                 let res = rx.recv().await;
@@ -547,10 +573,13 @@ mod tests {
         });
     }
 
-
     #[test]
     fn test_tx_future_rx_blocking_1_thread_single() {
-        let rt = tokio::runtime::Builder::new_multi_thread().enable_all().worker_threads(1).build().unwrap();
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .worker_threads(1)
+            .build()
+            .unwrap();
         rt.block_on(async move {
             let (tx, rx) = bounded_tx_future_rx_blocking::<i32>(10);
             let rx_res = rx.try_recv();
@@ -567,21 +596,21 @@ mod tests {
             let (noti_tx, noti_rx) = tokio::sync::oneshot::channel::<bool>();
             tokio::spawn(async move {
                 for i in 0i32..5 {
-                    assert!(tx.send(10+i).await.is_ok());
+                    assert!(tx.send(10 + i).await.is_ok());
                     tokio::time::sleep(Duration::from_secs(1)).await;
                 }
                 println!("tx close");
                 let _ = noti_tx.send(true);
             });
-            for i in 0i32..15  {
+            for i in 0i32..15 {
                 match rx.recv() {
-                    Ok(j)=>{
+                    Ok(j) => {
                         println!("recv {}", i);
                         assert_eq!(i, j);
-                    },
-                    Err(e)=>{
+                    }
+                    Err(e) => {
                         panic!("error {}", e);
-                    },
+                    }
                 }
             }
             let res = rx.recv();
@@ -607,7 +636,11 @@ mod tests {
     }
 
     fn _future_both_thread_multi(real_threads: usize, tx_count: usize, rx_count: usize) {
-        let rt = tokio::runtime::Builder::new_multi_thread().worker_threads(real_threads).enable_all().build().unwrap();
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(real_threads)
+            .enable_all()
+            .build()
+            .unwrap();
         rt.block_on(async move {
             let (tx, rx) = bounded_future_both::<i32>(10);
             let (noti_tx, mut noti_rx) = tokio::sync::mpsc::channel::<usize>(tx_count + rx_count);
@@ -620,10 +653,10 @@ mod tests {
                 let mut _noti_tx = noti_tx.clone();
                 let _round = round;
                 tokio::spawn(async move {
-                    for i in 0i32.._round  {
+                    for i in 0i32.._round {
                         match _tx.send(i).await {
-                            Err(e)=>panic!("{}", e),
-                            _=>{},
+                            Err(e) => panic!("{}", e),
+                            _ => {}
                         }
                     }
                     let _ = _noti_tx.send(_tx_i).await;
@@ -637,11 +670,11 @@ mod tests {
                 tokio::spawn(async move {
                     'A: loop {
                         match _rx.recv().await {
-                            Ok(_i) =>{
+                            Ok(_i) => {
                                 _counter.as_ref().fetch_add(1i32, Ordering::SeqCst);
                                 //print!("recv {} {}\r", _rx_i, i);
-                            },
-                            Err(_)=>break 'A,
+                            }
+                            Err(_) => break 'A,
                         }
                     }
                     let _ = _noti_tx.send(_rx_i).await;
@@ -651,18 +684,22 @@ mod tests {
             drop(tx);
             drop(rx);
             drop(noti_tx);
-            for _ in 0..(rx_count+tx_count) {
+            for _ in 0..(rx_count + tx_count) {
                 match noti_rx.recv().await {
-                    Some(_)=>{},
-                    None=>break,
+                    Some(_) => {}
+                    None => break,
                 }
             }
             assert_eq!(counter.as_ref().load(Ordering::Relaxed), round * (tx_count as i32));
         });
     }
 
-   fn _tx_blocking_rx_future_multi(real_threads: usize, tx_count: usize, rx_count: usize) {
-        let rt = tokio::runtime::Builder::new_multi_thread().worker_threads(real_threads).enable_all().build().unwrap();
+    fn _tx_blocking_rx_future_multi(real_threads: usize, tx_count: usize, rx_count: usize) {
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(real_threads)
+            .enable_all()
+            .build()
+            .unwrap();
         let (tx, rx) = bounded_tx_blocking_rx_future::<i32>(10);
         let counter = Arc::new(AtomicI32::new(0));
         let round = 100000;
@@ -679,10 +716,10 @@ mod tests {
                         break;
                     }
                     match _tx.send(i) {
-                        Err(e)=>panic!("{}", e),
-                        _=>{
+                        Err(e) => panic!("{}", e),
+                        _ => {
                             //println!("tx {} {}", _tx_i, i);
-                        },
+                        }
                     }
                 }
                 println!("tx {} exit", _tx_i);
@@ -690,7 +727,6 @@ mod tests {
         }
         drop(tx);
         rt.block_on(async move {
-
             let (noti_tx, mut noti_rx) = tokio::sync::mpsc::channel::<usize>(rx_count);
             for _rx_i in 0..rx_count {
                 let _rx = rx.clone();
@@ -699,11 +735,11 @@ mod tests {
                 tokio::spawn(async move {
                     'A: loop {
                         match _rx.recv().await {
-                            Ok(_i) =>{
+                            Ok(_i) => {
                                 _counter.as_ref().fetch_add(1i32, Ordering::SeqCst);
                                 //println!("rx {} {}\r", _rx_i, _i);
-                            },
-                            Err(_)=>break 'A,
+                            }
+                            Err(_) => break 'A,
                         }
                     }
                     println!("rx {} exiting", _rx_i);
@@ -715,8 +751,8 @@ mod tests {
             drop(noti_tx);
             for _ in 0..(rx_count) {
                 match noti_rx.recv().await {
-                    Some(_)=>{},
-                    None=>break,
+                    Some(_) => {}
+                    None => break,
                 }
             }
             assert_eq!(counter.as_ref().load(Ordering::Relaxed), round as i32);
@@ -741,8 +777,12 @@ mod tests {
         _tx_blocking_rx_future_multi(8, 4, 4);
     }
 
-   fn _tx_future_rx_blocking_multi(real_threads: usize, tx_count: usize, rx_count: usize) {
-        let rt = tokio::runtime::Builder::new_multi_thread().worker_threads(real_threads).enable_all().build().unwrap();
+    fn _tx_future_rx_blocking_multi(real_threads: usize, tx_count: usize, rx_count: usize) {
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(real_threads)
+            .enable_all()
+            .build()
+            .unwrap();
         let (tx, rx) = bounded_tx_future_rx_blocking::<i32>(10);
         let counter = Arc::new(AtomicI32::new(0));
         let round = 100000;
@@ -754,11 +794,11 @@ mod tests {
             rx_ths.push(thread::spawn(move || {
                 'A: loop {
                     match _rx.recv() {
-                        Ok(_) =>{
+                        Ok(_) => {
                             _counter.as_ref().fetch_add(1i32, Ordering::SeqCst);
                             //print!("{} {}\r", _rx_i, i);
-                        },
-                        Err(_)=>break 'A,
+                        }
+                        Err(_) => break 'A,
                     }
                 }
                 println!("rx {} exit", _rx_i);
@@ -766,16 +806,15 @@ mod tests {
         }
         drop(rx);
         rt.block_on(async move {
-
             let (noti_tx, mut noti_rx) = tokio::sync::mpsc::channel::<usize>(tx_count);
             for _tx_i in 0..tx_count {
                 let _tx = tx.clone();
                 let mut _noti_tx = noti_tx.clone();
                 tokio::spawn(async move {
-                    for i in 0i32..round  {
+                    for i in 0i32..round {
                         match _tx.send(i).await {
-                            Err(e)=>panic!("{}", e),
-                            _=>{},
+                            Err(e) => panic!("{}", e),
+                            _ => {}
                         }
                     }
                     let _ = _noti_tx.send(_tx_i).await;
@@ -786,8 +825,8 @@ mod tests {
             drop(noti_tx);
             for _ in 0..(tx_count) {
                 match noti_rx.recv().await {
-                    Some(_)=>{},
-                    None=>break,
+                    Some(_) => {}
+                    None => break,
                 }
             }
         });
@@ -814,7 +853,11 @@ mod tests {
 
     #[test]
     fn test_timeout_future_both() {
-        let rt = tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_all().build().unwrap();
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_all()
+            .build()
+            .unwrap();
         rt.block_on(async move {
             let (tx, rx) = bounded_future_both::<i32>(100);
             assert!(timeout(Duration::from_secs(1), rx.recv()).await.is_err());
@@ -823,7 +866,7 @@ mod tests {
                 match rx.recv().await {
                     Ok(item) => {
                         let _ = tx_done.send(item);
-                    },
+                    }
                     Err(_e) => {
                         println!("recv error");
                     }
@@ -833,5 +876,4 @@ mod tests {
             assert_eq!(rx_done.recv().unwrap(), 1);
         });
     }
-
 }

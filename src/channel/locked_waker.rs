@@ -1,4 +1,4 @@
-use std::sync::{Arc, Weak, atomic::{AtomicBool, Ordering, spin_loop_hint}};
+use std::sync::{Arc, Weak, atomic::{AtomicBool, Ordering}};
 use std::task::*;
 
 pub struct LockedWaker (Arc<LockedWakerInner>);
@@ -55,7 +55,7 @@ impl LockedWaker {
             return true
         }
         while _self.locked.swap(true, Ordering::SeqCst) {
-            spin_loop_hint();
+            std::hint::spin_loop();
         }
         let r = _self.waked.swap(true, Ordering::SeqCst);
         _self.locked.store(false, Ordering::Release);
@@ -81,7 +81,7 @@ impl LockedWaker {
     pub(crate) fn wake(&self) -> bool {
         let _self = self.0.as_ref();
         while _self.locked.swap(true, Ordering::SeqCst) {
-            spin_loop_hint();
+            std::hint::spin_loop();
         }
         if _self.waked.swap(true, Ordering::SeqCst) == false {
             _self.waker.wake_by_ref();

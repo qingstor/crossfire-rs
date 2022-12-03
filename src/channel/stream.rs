@@ -87,7 +87,7 @@ mod tests {
     #[test]
     fn test_into_stream() {
         println!();
-        let mut rt = tokio::runtime::Builder::new().threaded_scheduler().enable_all().core_threads(2).build().unwrap();
+        let rt = tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_all().build().unwrap();
         rt.block_on(async move {
             let total_message = 100;
             let (tx, rx) = crate::mpmc::bounded_future_both::<i32>(2);

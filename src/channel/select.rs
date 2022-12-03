@@ -16,10 +16,10 @@ use std::cell::UnsafeCell;
 ///
 ///  use crossfire::mpmc;
 ///  use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
-///  use tokio::time::{delay_for, Duration};
+///  use tokio::time::{sleep, Duration};
 ///  use crossfire::channel::SelectSame;
 ///
-///  let mut rt = tokio::runtime::Builder::new().threaded_scheduler().enable_all().build().unwrap();
+///  let rt = tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_all().build().unwrap();
 ///  rt.block_on(async move {
 ///      let (tx1, rx1) = mpmc::bounded_future_both::<i32>(3);
 ///      let (tx2, rx2) = mpmc::bounded_future_both::<i32>(2);
@@ -51,7 +51,7 @@ use std::cell::UnsafeCell;
 ///      tokio::spawn(async move {
 ///          for i in 0..1000i32 {
 ///              let _ = tx1.send(i).await;
-///              delay_for(Duration::from_millis(1)).await;
+///              sleep(Duration::from_millis(1)).await;
 ///          }
 ///          for i in 1500..2500i32 {
 ///              let _ = tx1.send(i).await;
@@ -301,11 +301,11 @@ mod tests {
     use std::sync::Arc;
     use crate::mpsc;
     use crate::mpmc;
-    use tokio::time::{Duration, delay_for};
+    use tokio::time::Duration;
 
     #[test]
     fn test_select_same_mpsc() {
-        let mut rt = tokio::runtime::Builder::new().threaded_scheduler().enable_all().core_threads(2).build().unwrap();
+        let rt = tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_all().build().unwrap();
         rt.block_on(async move {
             let (tx1, rx1) = mpsc::bounded_future_both::<i32>(3);
             let (tx2, rx2) = mpsc::bounded_future_both::<i32>(2);
@@ -320,10 +320,10 @@ mod tests {
             tokio::spawn(async move {
                 for i in 0..1000i32 {
                     let _ = tx1.send(i).await;
-                    delay_for(Duration::from_millis(1)).await;
+                    tokio::time::sleep(Duration::from_millis(1)).await;
                 }
                 println!("tx 1 sleep 1");
-                delay_for(Duration::from_secs(1)).await;
+                tokio::time::sleep(Duration::from_secs(1)).await;
                 for i in 0..1000i32 {
                     let _ = tx1.send(i).await;
                 }
@@ -331,7 +331,7 @@ mod tests {
             tokio::spawn(async move {
                 for i in 1000..1010i32 {
                     println!("tx 2 sleep 1");
-                    delay_for(Duration::from_secs(1)).await;
+                    tokio::time::sleep(Duration::from_secs(1)).await;
                     let _ = tx2.send(i).await;
                 }
             });
@@ -350,7 +350,7 @@ mod tests {
 
     #[test]
     fn test_select_same_mpmc() {
-        let mut rt = tokio::runtime::Builder::new().threaded_scheduler().enable_all().core_threads(2).build().unwrap();
+        let rt = tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_all().build().unwrap();
         rt.block_on(async move {
             let (tx1, rx1) = mpmc::bounded_future_both::<i32>(3);
             let (tx2, rx2) = mpmc::bounded_future_both::<i32>(2);
@@ -384,10 +384,10 @@ mod tests {
             tokio::spawn(async move {
                 for i in 0..1000i32 {
                     let _ = tx1.send(i).await;
-                    delay_for(Duration::from_millis(1)).await;
+                    tokio::time::sleep(Duration::from_millis(1)).await;
                 }
                 println!("tx 1 sleep 1");
-                delay_for(Duration::from_secs(1)).await;
+                tokio::time::sleep(Duration::from_secs(1)).await;
                 for i in 1500..2500i32 {
                     let _ = tx1.send(i).await;
                 }
@@ -395,7 +395,7 @@ mod tests {
             tokio::spawn(async move {
                 for i in 1000..1010i32 {
                     println!("tx 2 sleep 1");
-                    delay_for(Duration::from_secs(1)).await;
+                    tokio::time::sleep(Duration::from_secs(1)).await;
                     let _ = tx2.send(i).await;
                     //println!("tx2 sent {}", i);
                 }

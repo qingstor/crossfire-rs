@@ -133,7 +133,7 @@ mod tests {
     #[test]
     fn bench_tokio_mpsc_performance() {
         println!();
-        let mut rt = tokio::runtime::Builder::new().threaded_scheduler().enable_all().core_threads(2).build().unwrap();
+        let rt = tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_all().build().unwrap();
         rt.block_on(async move {
             let total_message = 1000000;
             let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<i32>();
@@ -162,7 +162,7 @@ mod tests {
     #[test]
     fn bench_tx_blocking_rx_future_performance() {
         println!();
-        let mut rt = tokio::runtime::Builder::new().threaded_scheduler().enable_all().core_threads(1).build().unwrap();
+        let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
         let total_message = 1000000;
         let (tx, rx_f) = unbounded_future::<i32>();
         let start = Instant::now();
@@ -183,7 +183,7 @@ mod tests {
     }
 
     fn _tx_blocking_rx_future_multi(real_threads: usize, tx_count: usize) {
-        let mut rt = tokio::runtime::Builder::new().threaded_scheduler().enable_all().core_threads(real_threads).build().unwrap();
+        let rt = tokio::runtime::Builder::new_multi_thread().worker_threads(real_threads).enable_all().build().unwrap();
         let (tx, rx) = unbounded_future::<i32>();
         let counter = Arc::new(AtomicI32::new(0));
         let round = 100000;

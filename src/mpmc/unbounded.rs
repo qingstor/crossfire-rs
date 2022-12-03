@@ -105,7 +105,7 @@ mod tests {
     use std::time::Instant;
     use std::thread;
     use std::sync::atomic::{AtomicI32, Ordering};
-    use tokio::time::{delay_for, Duration};
+    use tokio::time::Duration;
 
     #[test]
     fn bench_std_channel_performance() {
@@ -154,7 +154,7 @@ mod tests {
     #[test]
     fn bench_tokio_mpsc_performance() {
         println!();
-        let mut rt = tokio::runtime::Builder::new().threaded_scheduler().enable_all().core_threads(2).build().unwrap();
+        let rt = tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_all().build().unwrap();
         rt.block_on(async move {
             let total_message = 1000000;
             let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<i32>();
@@ -183,7 +183,7 @@ mod tests {
     #[test]
     fn bench_tx_blocking_rx_future_performance() {
         println!();
-        let mut rt = tokio::runtime::Builder::new().threaded_scheduler().enable_all().core_threads(1).build().unwrap();
+        let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
         let total_message = 1000000;
         let (tx, rx_f) = unbounded_future::<i32>();
         let start = Instant::now();
@@ -204,7 +204,7 @@ mod tests {
     }
 
     fn _tx_blocking_rx_future_multi(real_threads: usize, tx_count: usize) {
-        let mut rt = tokio::runtime::Builder::new().threaded_scheduler().enable_all().core_threads(real_threads).build().unwrap();
+        let rt = tokio::runtime::Builder::new_multi_thread().worker_threads(real_threads).enable_all().build().unwrap();
         let (tx, rx) = unbounded_future::<i32>();
         let counter = Arc::new(AtomicI32::new(0));
         let round = 100000;
@@ -260,12 +260,11 @@ mod tests {
     fn test_tx_unbounded_idle_select() {
 
         use futures::{pin_mut, select, FutureExt};
-
-        let mut rt = tokio::runtime::Builder::new().threaded_scheduler().enable_all().core_threads(2).build().unwrap();
+        let rt = tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_all().build().unwrap();
         let (_tx, rx_f) = unbounded_future::<i32>();
 
         async fn loop_fn() {
-            delay_for(Duration::from_millis(1)).await;
+            tokio::time::sleep(Duration::from_millis(1)).await;
         }
 
         rt.block_on(async move {
@@ -276,8 +275,8 @@ mod tests {
                     pin_mut!(f);
                     select! {
                         _ = f => {
-                            let (tx_wakers, rx_wakers) = rx_f.get_waker_length();
-                            //println!("waker rx {}", rx_wakers);
+                            let (_tx_wakers, _rx_wakers) = rx_f.get_waker_length();
+                            //println!("waker tx{} rx {}", _tx_wakers, _rx_wakers);
                         },
                         _ = c => {
                             unreachable!()

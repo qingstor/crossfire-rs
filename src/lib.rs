@@ -28,7 +28,7 @@
 //!
 //! // async-async
 //!
-//! let mut rt = tokio::runtime::Builder::new().enable_all().threaded_scheduler().build().unwrap();
+//! let rt = tokio::runtime::Builder::new_multi_thread().enable_all().build().unwrap();
 //!
 //! let (tx, rx) = mpsc::bounded_future_both::<i32>(100);
 //!

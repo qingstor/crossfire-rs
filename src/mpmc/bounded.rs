@@ -375,6 +375,51 @@ mod tests {
     }
 
     #[test]
+    fn bench_future_both_latency() {
+        println!();
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_all()
+            .build()
+            .unwrap();
+        rt.block_on(async move {
+            let total_message = 10000;
+            let (tx, rx) = bounded_future_both::<i32>(100);
+            let (tx_done, rx_done) = bounded_future_both::<()>(1);
+            let start = Instant::now();
+
+            let rx1 = rx.clone();
+            let tx_done1 = tx_done.clone();
+            tokio::spawn(async move {
+                while let Ok(_i) = rx1.recv().await {
+                    tx_done1.send(()).await;
+                }
+            });
+            let rx2 = rx.clone();
+            let tx_done2 = tx_done.clone();
+            tokio::spawn(async move {
+                while let Ok(_i) = rx2.recv().await {
+                    tx_done2.send(()).await;
+                }
+            });
+            println!("sender thread send {} message start", total_message);
+            for i in 0i32..total_message {
+                let _ = tx.send(i).await;
+                let _ = rx_done.recv().await;
+                //println!("sent {}", i);
+            }
+            println!("sender thread send {} message end", total_message);
+            let end = Instant::now();
+
+            println!(
+                "{} message, 2 channel roundtrip use mpmc {} /s",
+                total_message,
+                (total_message as f64) / end.duration_since(start).as_secs_f64()
+            );
+        });
+    }
+
+    #[test]
     fn bench_tx_blocking_rx_future_performance() {
         println!();
         let rt = tokio::runtime::Builder::new_multi_thread().enable_all().build().unwrap();

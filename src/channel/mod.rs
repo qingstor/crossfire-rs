@@ -73,7 +73,7 @@ macro_rules! clear_sender_wakers_common {
         if $seq & 15 != 0 {
             return;
         }
-        let limit = $self.tx_count.load(Ordering::Relaxed) as u64 + 200;
+        let limit = $self.tx_count.load(Ordering::Acquire) as u64 + 200;
         if $self.send_waker_rx_seq.load(Ordering::Acquire) + limit >= $seq {
             return;
         }
@@ -104,7 +104,7 @@ macro_rules! clear_recv_wakers_common {
         if $seq & 15 != 0 {
             return;
         }
-        let limit = $self.rx_count.load(Ordering::Relaxed) as u64 + 500;
+        let limit = $self.rx_count.load(Ordering::Acquire) as u64 + 500;
         if $self.recv_waker_rx_seq.load(Ordering::Acquire) + limit >= $seq {
             return;
         }

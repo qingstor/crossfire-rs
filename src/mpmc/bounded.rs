@@ -735,7 +735,7 @@ mod tests {
                     None => break,
                 }
             }
-            assert_eq!(counter.as_ref().load(Ordering::Relaxed), round * (tx_count as i32));
+            assert_eq!(counter.as_ref().load(Ordering::Acquire), round * (tx_count as i32));
         });
     }
 
@@ -800,7 +800,7 @@ mod tests {
                     None => break,
                 }
             }
-            assert_eq!(counter.as_ref().load(Ordering::Relaxed), round as i32);
+            assert_eq!(counter.as_ref().load(Ordering::Acquire), round as i32);
         });
         for th in tx_ths {
             let _ = th.join();
@@ -878,7 +878,7 @@ mod tests {
         for th in rx_ths {
             let _ = th.join();
         }
-        assert_eq!(counter.as_ref().load(Ordering::Relaxed), round * (tx_count as i32));
+        assert_eq!(counter.as_ref().load(Ordering::Acquire), round * (tx_count as i32));
     }
 
     #[test]

@@ -64,7 +64,7 @@ use std::task::{Context, Poll};
 ///      for th in ths {
 ///          let _ = th.await;
 ///      }
-///      assert_eq!(recv_count.load(Ordering::Relaxed), 2000 + 10);
+///      assert_eq!(recv_count.load(Ordering::Acquire), 2000 + 10);
 ///  });
 ///
 /// ```
@@ -93,16 +93,16 @@ macro_rules! try_recv_poll {
         drop($rx);
         match r {
             Ok(r) => {
-                $self.last_index.store($index, Ordering::Relaxed);
+                $self.last_index.store($index, Ordering::Release);
                 if $wakers[$index].is_none() && has_waker {
-                    $self.has_waker.fetch_sub(1, Ordering::Relaxed);
+                    $self.has_waker.fetch_sub(1, Ordering::SeqCst);
                 }
                 return Poll::Ready(Ok(r));
             }
             Err(e) => {
                 if e.is_empty() {
                     if $wakers[$index].is_some() && !has_waker {
-                        $self.has_waker.fetch_add(1, Ordering::Relaxed);
+                        $self.has_waker.fetch_add(1, Ordering::SeqCst);
                     }
                 } else {
                     $self.close_handler($index);
@@ -139,22 +139,22 @@ where
     }
 
     pub fn add_recv<Rx: AsyncRx<T> + 'static>(&self, rx: Rx) -> usize {
-        let op = self.size.fetch_add(1, Ordering::Relaxed);
+        let op = self.size.fetch_add(1, Ordering::SeqCst);
         self.get_handles().push(Some(Box::new(rx)));
         self.get_wakers().push(None);
-        self.left_handles.fetch_add(1, Ordering::Relaxed);
+        self.left_handles.fetch_add(1, Ordering::SeqCst);
         op
     }
 
     fn close_handler(&self, index: usize) {
         self.get_handles()[index] = None;
-        self.left_handles.fetch_sub(1, Ordering::Relaxed);
+        self.left_handles.fetch_sub(1, Ordering::SeqCst);
         let _ =
-            self.last_index.compare_exchange_weak(index, 0, Ordering::Relaxed, Ordering::Relaxed);
+            self.last_index.compare_exchange_weak(index, 0, Ordering::SeqCst, Ordering::SeqCst);
         let wakers = self.get_wakers();
         if wakers[index].is_some() {
             wakers[index] = None;
-            self.has_waker.fetch_sub(1, Ordering::Relaxed);
+            self.has_waker.fetch_sub(1, Ordering::SeqCst);
         }
     }
 
@@ -164,7 +164,7 @@ where
             debug_assert!(self.get_wakers()[index].is_none());
             match rx.try_recv() {
                 Ok(r) => {
-                    self.last_index.store(index, Ordering::Relaxed);
+                    self.last_index.store(index, Ordering::SeqCst);
                     return Some(r);
                 }
                 Err(e) => {
@@ -197,7 +197,7 @@ where
                 }
             }
         }
-        self.has_waker.store(0, Ordering::Relaxed);
+        self.has_waker.store(0, Ordering::Release);
     }
 
     pub async fn select(&self) -> Result<T, RecvError> {
@@ -225,13 +225,13 @@ where
         let _self = &self.selector;
         let handles = _self.get_handles();
         let wakers = _self.get_wakers();
-        if _self.left_handles.load(Ordering::Relaxed) == 0 {
+        if _self.left_handles.load(Ordering::Acquire) == 0 {
             return Poll::Ready(Err(RecvError {}));
         }
         let mut polled_last_index: Option<usize> = None;
         let mut polled_waked: Option<usize> = None;
         // Only Try waker is waked if waker exists
-        if _self.has_waker.load(Ordering::Relaxed) > 0 {
+        if _self.has_waker.load(Ordering::Acquire) > 0 {
             {
                 for i in 0..handles.len() {
                     let _rx = &handles[i];
@@ -245,13 +245,13 @@ where
                     }
                 }
             }
-            if _self.left_handles.load(Ordering::Relaxed) == 0 {
+            if _self.left_handles.load(Ordering::Acquire) == 0 {
                 return Poll::Ready(Err(RecvError {}));
             }
         }
         // Try last one first if no wakers
-        if _self.has_waker.load(Ordering::Relaxed) == 0 {
-            let last_index = _self.last_index.load(Ordering::Relaxed);
+        if _self.has_waker.load(Ordering::Acquire) == 0 {
+            let last_index = _self.last_index.load(Ordering::Acquire);
             if let Some(rx) = &handles[last_index] {
                 if !rx.is_empty() {
                     try_recv_poll!(_self, last_index, rx, ctx, wakers);
@@ -259,7 +259,7 @@ where
                 }
             }
         }
-        if _self.left_handles.load(Ordering::Relaxed) == 0 {
+        if _self.left_handles.load(Ordering::Acquire) == 0 {
             return Poll::Ready(Err(RecvError {}));
         }
         // Check any thing left without wakers
@@ -274,7 +274,7 @@ where
                 }
             }
         }
-        if _self.left_handles.load(Ordering::Relaxed) == 0 {
+        if _self.left_handles.load(Ordering::Acquire) == 0 {
             return Poll::Ready(Err(RecvError {}));
         }
         return Poll::Pending;
@@ -398,7 +398,7 @@ mod tests {
             for th in ths {
                 let _ = th.await;
             }
-            assert_eq!(recv_count.load(Ordering::Relaxed), 2000 + 10);
+            assert_eq!(recv_count.load(Ordering::Acquire), 2000 + 10);
         });
     }
 }

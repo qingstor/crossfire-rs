@@ -53,7 +53,7 @@ impl LockedWaker {
     // return is_already waked
     pub(crate) fn abandon(&self) -> bool {
         let _self = self.0.as_ref();
-        if _self.waked.load(Ordering::Relaxed) {
+        if _self.waked.load(Ordering::Acquire) {
             return true;
         }
         while _self.locked.swap(true, Ordering::SeqCst) {

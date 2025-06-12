@@ -16,8 +16,8 @@
 //!
 //! ```toml
 //! [dependencies]
-//! crossfire = "0.1"
-//! tokio = "0.2"
+//! crossfire = "1"
+//! tokio = "1"
 //! ```
 //!
 //! ```rust

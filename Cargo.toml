@@ -21,7 +21,5 @@ async-trait = "0.1"
 futures = "0.3"
 
 [dev-dependencies]
-log = { version = "0.4"}
-stderrlog = "0.4.1"
 tokio = { version = "1", features = ["time", "sync", "rt-multi-thread"] }
 rand = "0.7.3"

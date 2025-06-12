@@ -90,7 +90,6 @@ macro_rules! try_recv_poll {
     ($self: expr, $index: expr, $rx: expr, $ctx: expr, $wakers: expr) => {{
         let has_waker = $wakers[$index].is_some();
         let r = $rx.poll_item($ctx, &mut $wakers[$index]);
-        drop($rx);
         match r {
             Ok(r) => {
                 $self.last_index.store($index, Ordering::Release);
@@ -237,7 +236,7 @@ where
                     let _rx = &handles[i];
                     if let Some(waker) = &wakers[i] {
                         if waker.is_waked() {
-                            if let Some(ref rx) = _rx {
+                            if let Some(rx) = _rx {
                                 try_recv_poll!(_self, i, rx, ctx, wakers);
                                 polled_waked = Some(i);
                             }

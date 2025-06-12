@@ -392,14 +392,14 @@ mod tests {
             let tx_done1 = tx_done.clone();
             tokio::spawn(async move {
                 while let Ok(_i) = rx1.recv().await {
-                    tx_done1.send(()).await;
+                    let _ = tx_done1.send(()).await;
                 }
             });
             let rx2 = rx.clone();
             let tx_done2 = tx_done.clone();
             tokio::spawn(async move {
                 while let Ok(_i) = rx2.recv().await {
-                    tx_done2.send(()).await;
+                    let _ = tx_done2.send(()).await;
                 }
             });
             println!("sender thread send {} message start", total_message);

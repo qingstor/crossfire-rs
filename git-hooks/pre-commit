@@ -1,0 +1,11 @@
+#!/bin/bash
+
+make fmt || exit 1
+
+# re add the files since changed by fmt
+files=$(git diff --cached --name-only --diff-filter=ACM | grep '.rs$')
+for f in $files; do
+	echo "git add $f"
+	git add $f
+done
+exit 0

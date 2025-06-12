@@ -71,7 +71,7 @@ Error types are re-exported from crossbeam-channel.
 
 ## Compatibility
 
-Supports stable Rust. Mainly tested on tokio-0.2 (Not tested on async-std or other runtime).
+Supports stable Rust. Mainly tested on tokio-1.x (Not tested on async-std or other runtime).
 future::selects and timeout work fine, but it takes advantage of runtime behavior not documented by Rust official.
 
 Refer to https://github.com/rust-lang/rust/issues/73002

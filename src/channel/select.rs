@@ -148,8 +148,7 @@ where
     fn close_handler(&self, index: usize) {
         self.get_handles()[index] = None;
         self.left_handles.fetch_sub(1, Ordering::SeqCst);
-        let _ =
-            self.last_index.compare_exchange_weak(index, 0, Ordering::SeqCst, Ordering::SeqCst);
+        let _ = self.last_index.compare_exchange_weak(index, 0, Ordering::SeqCst, Ordering::SeqCst);
         let wakers = self.get_wakers();
         if wakers[index].is_some() {
             wakers[index] = None;

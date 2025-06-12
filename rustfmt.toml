@@ -1,6 +1,6 @@
 #unstable_features = true
 edition = "2018"
-fn_args_layout = "Compressed"
+fn_params_layout = "Compressed"
 newline_style = "Unix"
 use_small_heuristics = "Max"
 max_width = 100

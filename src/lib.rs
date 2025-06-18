@@ -79,3 +79,5 @@ extern crate futures;
 pub mod channel;
 pub mod mpmc;
 pub mod mpsc;
+
+pub use crossbeam::channel::{RecvError, SendError, TryRecvError, TrySendError};

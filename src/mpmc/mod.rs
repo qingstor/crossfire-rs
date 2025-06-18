@@ -8,7 +8,6 @@ pub use bounded::{
 };
 pub use bounded::{SharedFutureBoth, SharedSenderBRecvF, SharedSenderFRecvB};
 mod unbounded;
-pub use crossbeam::channel::{RecvError, SendError, TryRecvError, TrySendError};
 pub use unbounded::{unbounded_future, RxUnbounded, TxUnbounded, UnboundedSharedFuture};
 
 pub use crate::channel::{AsyncRx, LockedWaker};

@@ -3,8 +3,8 @@ use super::tx::*;
 use crate::channel::*;
 use crossbeam::queue::ArrayQueue;
 use std::sync::{
-    atomic::{AtomicUsize, Ordering},
     Arc,
+    atomic::{AtomicUsize, Ordering},
 };
 use std::task::*;
 
@@ -100,8 +100,11 @@ mod tests {
         }
         let end = Instant::now();
 
-        println!("{} message, single sender thread single receiver thread use std::sync::sync_channel, cost time:{} s",
-                 total_message, (total_message as f64) / end.duration_since(start).as_secs_f64());
+        println!(
+            "{} message, single sender thread single receiver thread use std::sync::sync_channel, cost time:{} s",
+            total_message,
+            (total_message as f64) / end.duration_since(start).as_secs_f64()
+        );
     }
 
     #[test]

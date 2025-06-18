@@ -1,5 +1,4 @@
-#unstable_features = true
-edition = "2018"
+edition = "2024"
 fn_params_layout = "Compressed"
 newline_style = "Unix"
 use_small_heuristics = "Max"

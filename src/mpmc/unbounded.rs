@@ -3,8 +3,8 @@ use super::tx::*;
 use crate::channel::*;
 use crossbeam::queue::SegQueue;
 use std::sync::{
-    atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
     Arc,
+    atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
 };
 use std::task::*;
 
@@ -125,8 +125,11 @@ mod tests {
         }
         let end = Instant::now();
 
-        println!("{} message, single sender thread single receiver thread use std::sync::sync_channel, cost time:{} s",
-                 total_message, (total_message as f64) / end.duration_since(start).as_secs_f64());
+        println!(
+            "{} message, single sender thread single receiver thread use std::sync::sync_channel, cost time:{} s",
+            total_message,
+            (total_message as f64) / end.duration_since(start).as_secs_f64()
+        );
     }
 
     #[test]
@@ -271,7 +274,7 @@ mod tests {
 
     #[test]
     fn test_tx_unbounded_idle_select() {
-        use futures::{pin_mut, select, FutureExt};
+        use futures::{FutureExt, pin_mut, select};
         let rt = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2)
             .enable_all()

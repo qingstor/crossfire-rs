@@ -7,12 +7,12 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 
 /// Receiver that dose not support async
-pub struct RxBlocking<T, S: MPMCShared> {
+pub struct RxBlocking<T, S: ChannelShared> {
     recv: Receiver<T>,
     shared: Arc<S>,
 }
 
-impl<T, S: MPMCShared> Clone for RxBlocking<T, S> {
+impl<T, S: ChannelShared> Clone for RxBlocking<T, S> {
     #[inline]
     fn clone(&self) -> Self {
         self.shared.add_rx();
@@ -20,13 +20,13 @@ impl<T, S: MPMCShared> Clone for RxBlocking<T, S> {
     }
 }
 
-impl<T, S: MPMCShared> Drop for RxBlocking<T, S> {
+impl<T, S: ChannelShared> Drop for RxBlocking<T, S> {
     fn drop(&mut self) {
         self.shared.close_rx();
     }
 }
 
-impl<T, S: MPMCShared> RxBlocking<T, S> {
+impl<T, S: ChannelShared> RxBlocking<T, S> {
     #[inline]
     pub(crate) fn new(recv: Receiver<T>, shared: Arc<S>) -> Self {
         Self { recv, shared }
@@ -81,12 +81,12 @@ impl<T, S: MPMCShared> RxBlocking<T, S> {
     }
 }
 
-pub struct RxFuture<T, S: MPMCShared> {
+pub struct RxFuture<T, S: ChannelShared> {
     recv: Receiver<T>,
     shared: Arc<S>,
 }
 
-impl<T, S: MPMCShared> Clone for RxFuture<T, S> {
+impl<T, S: ChannelShared> Clone for RxFuture<T, S> {
     #[inline]
     fn clone(&self) -> Self {
         self.shared.add_rx();
@@ -94,13 +94,13 @@ impl<T, S: MPMCShared> Clone for RxFuture<T, S> {
     }
 }
 
-impl<T, S: MPMCShared> Drop for RxFuture<T, S> {
+impl<T, S: ChannelShared> Drop for RxFuture<T, S> {
     fn drop(&mut self) {
         self.shared.close_rx();
     }
 }
 
-impl<T, S: MPMCShared> RxFuture<T, S> {
+impl<T, S: ChannelShared> RxFuture<T, S> {
     #[inline]
     pub(crate) fn new(recv: Receiver<T>, shared: Arc<S>) -> Self {
         Self { recv, shared }
@@ -130,13 +130,6 @@ impl<T, S: MPMCShared> RxFuture<T, S> {
                 return Ok(i);
             }
         }
-    }
-
-    /// Cleanup when waker need to be canceled inside the channel.
-    /// Use only when writing your own custom future.
-    #[inline]
-    fn clear_recv_wakers(&self, waker: LockedWaker) {
-        self.shared.clear_recv_wakers(waker);
     }
 
     #[inline]
@@ -243,7 +236,7 @@ impl<T, S: MPMCShared> RxFuture<T, S> {
 }
 
 #[async_trait]
-impl<'a, T: Send + Sync + 'static, S: MPMCShared> AsyncRx<T> for RxFuture<T, S> {
+impl<'a, T: Send + Sync + 'static, S: ChannelShared> AsyncRx<T> for RxFuture<T, S> {
     #[inline(always)]
     fn poll_item(
         &self, ctx: &mut Context, waker: &mut Option<LockedWaker>,
@@ -267,22 +260,22 @@ impl<'a, T: Send + Sync + 'static, S: MPMCShared> AsyncRx<T> for RxFuture<T, S> 
     }
 
     #[inline(always)]
-    fn clear_recv_wakers(&self, waker: LockedWaker) {
-        self.clear_recv_wakers(waker)
-    }
-
-    #[inline(always)]
     fn on_send(&self) {
         self.shared.on_send();
     }
+
+    #[inline(always)]
+    fn clear_recv_wakers(&self, seq: u64) {
+        self.shared.clear_recv_wakers(seq)
+    }
 }
 
-pub struct ReceiveFuture<'a, T, S: MPMCShared> {
+pub struct ReceiveFuture<'a, T, S: ChannelShared> {
     rx: &'a RxFuture<T, S>,
     waker: Option<LockedWaker>,
 }
 
-impl<T, S: MPMCShared> Drop for ReceiveFuture<'_, T, S> {
+impl<T, S: ChannelShared> Drop for ReceiveFuture<'_, T, S> {
     fn drop(&mut self) {
         if let Some(waker) = self.waker.take() {
             if waker.abandon() {
@@ -291,22 +284,13 @@ impl<T, S: MPMCShared> Drop for ReceiveFuture<'_, T, S> {
                     self.rx.shared.on_send();
                 }
             } else {
-                self.rx.clear_recv_wakers(waker);
+                self.rx.shared.clear_recv_wakers(waker.get_seq());
             }
         }
     }
 }
 
-impl<T, S: MPMCShared> ReceiveFuture<'_, T, S> {
-    // Take waker to save outside, so that waker will not be dropped (canceled).
-    // You may need to try_recv or make another ReceiveFuture once woke up.
-    #[inline]
-    pub fn take_waker(&mut self) -> Option<LockedWaker> {
-        self.waker.take()
-    }
-}
-
-impl<T, S: MPMCShared> Future for ReceiveFuture<'_, T, S> {
+impl<T, S: ChannelShared> Future for ReceiveFuture<'_, T, S> {
     type Output = Result<T, RecvError>;
 
     fn poll(self: Pin<&mut Self>, ctx: &mut Context) -> Poll<Self::Output> {

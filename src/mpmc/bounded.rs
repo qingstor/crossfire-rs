@@ -56,7 +56,7 @@ pub struct SharedFutureBoth {
     checking_recv: AtomicBool,
 }
 
-impl MPMCShared for SharedFutureBoth {
+impl ChannelShared for SharedFutureBoth {
     fn new() -> Self {
         Self {
             sender_waker: SegQueue::new(),
@@ -122,13 +122,13 @@ impl MPMCShared for SharedFutureBoth {
     }
 
     #[inline]
-    fn clear_send_wakers(&self, waker: LockedWaker) {
-        clear_sender_wakers_common!(self, waker.get_seq())
+    fn clear_send_wakers(&self, seq: u64) {
+        clear_sender_wakers_common!(self, seq)
     }
 
     #[inline]
-    fn clear_recv_wakers(&self, waker: LockedWaker) {
-        clear_recv_wakers_common!(self, waker.get_seq())
+    fn clear_recv_wakers(&self, seq: u64) {
+        clear_recv_wakers_common!(self, seq)
     }
 }
 
@@ -141,7 +141,7 @@ pub struct SharedSenderBRecvF {
     checking_recv: AtomicBool,
 }
 
-impl MPMCShared for SharedSenderBRecvF {
+impl ChannelShared for SharedSenderBRecvF {
     fn new() -> Self {
         Self {
             recv_waker: SegQueue::new(),
@@ -201,8 +201,8 @@ impl MPMCShared for SharedSenderBRecvF {
     }
 
     #[inline]
-    fn clear_recv_wakers(&self, waker: LockedWaker) {
-        clear_recv_wakers_common!(self, waker.get_seq())
+    fn clear_recv_wakers(&self, seq: u64) {
+        clear_recv_wakers_common!(self, seq)
     }
 }
 
@@ -215,7 +215,7 @@ pub struct SharedSenderFRecvB {
     checking_sender: AtomicBool,
 }
 
-impl MPMCShared for SharedSenderFRecvB {
+impl ChannelShared for SharedSenderFRecvB {
     fn new() -> Self {
         Self {
             sender_waker: SegQueue::new(),
@@ -271,8 +271,8 @@ impl MPMCShared for SharedSenderFRecvB {
     }
 
     #[inline]
-    fn clear_send_wakers(&self, waker: LockedWaker) {
-        clear_sender_wakers_common!(self, waker.get_seq())
+    fn clear_send_wakers(&self, seq: u64) {
+        clear_sender_wakers_common!(self, seq)
     }
 
     fn get_waker_length(&self) -> (usize, usize) {

@@ -5,12 +5,12 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
-pub struct TxBlocking<T, S: MPSCShared> {
+pub struct TxBlocking<T, S: ChannelShared> {
     sender: Sender<T>,
     shared: Arc<S>,
 }
 
-impl<T, S: MPSCShared> Clone for TxBlocking<T, S> {
+impl<T, S: ChannelShared> Clone for TxBlocking<T, S> {
     #[inline]
     fn clone(&self) -> Self {
         self.shared.add_tx();
@@ -18,13 +18,13 @@ impl<T, S: MPSCShared> Clone for TxBlocking<T, S> {
     }
 }
 
-impl<T, S: MPSCShared> Drop for TxBlocking<T, S> {
+impl<T, S: ChannelShared> Drop for TxBlocking<T, S> {
     fn drop(&mut self) {
         self.shared.close_tx();
     }
 }
 
-impl<T, S: MPSCShared> TxBlocking<T, S> {
+impl<T, S: ChannelShared> TxBlocking<T, S> {
     #[inline]
     pub(crate) fn new(sender: Sender<T>, shared: Arc<S>) -> Self {
         Self { sender, shared }
@@ -63,12 +63,12 @@ impl<T, S: MPSCShared> TxBlocking<T, S> {
     }
 }
 
-pub struct TxFuture<T, S: MPSCShared> {
+pub struct TxFuture<T, S: ChannelShared> {
     sender: Sender<T>,
     shared: Arc<S>,
 }
 
-impl<T, S: MPSCShared> Clone for TxFuture<T, S> {
+impl<T, S: ChannelShared> Clone for TxFuture<T, S> {
     #[inline]
     fn clone(&self) -> Self {
         self.shared.add_tx();
@@ -76,13 +76,13 @@ impl<T, S: MPSCShared> Clone for TxFuture<T, S> {
     }
 }
 
-impl<T, S: MPSCShared> Drop for TxFuture<T, S> {
+impl<T, S: ChannelShared> Drop for TxFuture<T, S> {
     fn drop(&mut self) {
         self.shared.close_tx();
     }
 }
 
-impl<T: Unpin, S: MPSCShared> TxFuture<T, S> {
+impl<T: Unpin, S: ChannelShared> TxFuture<T, S> {
     #[inline]
     pub(crate) fn new(sender: Sender<T>, shared: Arc<S>) -> Self {
         Self { sender, shared }
@@ -141,11 +141,6 @@ impl<T: Unpin, S: MPSCShared> TxFuture<T, S> {
         return self.shared.get_waker_length();
     }
 
-    #[inline]
-    fn clear_send_wakers(&self, waker: LockedWaker) {
-        self.shared.clear_send_wakers(waker);
-    }
-
     #[inline(always)]
     fn poll_send<'a>(
         &'a self, ctx: &'a mut Context, mut item: T, waker: &'a mut Option<LockedWaker>,
@@ -201,13 +196,13 @@ impl<T: Unpin, S: MPSCShared> TxFuture<T, S> {
     }
 }
 
-pub struct SendFuture<'a, T: Unpin, S: MPSCShared> {
+pub struct SendFuture<'a, T: Unpin, S: ChannelShared> {
     tx: &'a TxFuture<T, S>,
     item: Option<T>,
     waker: Option<LockedWaker>,
 }
 
-impl<'a, T: Unpin, S: MPSCShared> Drop for SendFuture<'a, T, S> {
+impl<'a, T: Unpin, S: ChannelShared> Drop for SendFuture<'a, T, S> {
     fn drop(&mut self) {
         if let Some(waker) = self.waker.take() {
             if waker.abandon() {
@@ -216,13 +211,13 @@ impl<'a, T: Unpin, S: MPSCShared> Drop for SendFuture<'a, T, S> {
                     self.tx.shared.on_recv();
                 }
             } else {
-                self.tx.clear_send_wakers(waker);
+                self.tx.shared.clear_send_wakers(waker.get_seq());
             }
         }
     }
 }
 
-impl<'a, T: Unpin, S: MPSCShared> Future for SendFuture<'a, T, S> {
+impl<'a, T: Unpin, S: ChannelShared> Future for SendFuture<'a, T, S> {
     type Output = Result<(), SendError<T>>;
 
     fn poll(self: Pin<&mut Self>, ctx: &mut Context) -> Poll<Self::Output> {

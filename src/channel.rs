@@ -3,48 +3,29 @@ use crossbeam::channel::{RecvError, TryRecvError};
 use std::task::Context;
 
 /// This defines interface for mpmc channel shared state
-pub trait MPMCShared: Sync + Send {
+pub trait ChannelShared: Sync + Send {
     fn new() -> Self;
     fn on_recv(&self);
     fn on_send(&self);
     fn reg_recv(&self, _ctx: &mut Context) -> Option<LockedWaker>;
     fn reg_send(&self, _ctx: &mut Context) -> Option<LockedWaker>;
     fn add_tx(&self);
-    fn add_rx(&self);
+    #[inline(always)]
+    fn add_rx(&self) {}
     fn close_tx(&self);
     fn close_rx(&self);
     fn get_tx_count(&self) -> usize;
 
+    #[inline(always)]
     fn get_waker_length(&self) -> (usize, usize) {
         return (0, 0);
     }
 
-    #[inline]
-    fn clear_send_wakers(&self, _waker: LockedWaker) {}
-
-    #[inline]
-    fn clear_recv_wakers(&self, _waker: LockedWaker) {}
-}
-
-/// This defines interface for mpsc channel shared state
-pub trait MPSCShared: Sync + Send {
-    fn new() -> Self;
-    fn on_recv(&self);
-    fn on_send(&self);
-    fn cancel_recv_reg(&self);
-    fn reg_recv(&self, _ctx: &mut Context) -> Option<LockedWaker>;
-    fn reg_send(&self, _ctx: &mut Context) -> Option<LockedWaker>;
-    fn add_tx(&self);
-    fn close_tx(&self);
-    fn close_rx(&self);
-    fn get_tx_count(&self) -> usize;
-
-    fn get_waker_length(&self) -> (usize, usize) {
-        return (0, 0);
-    }
-
-    #[inline]
-    fn clear_send_wakers(&self, _waker: LockedWaker) {}
+    /// seq: The seq of waker
+    #[inline(always)]
+    fn clear_send_wakers(&self, _seq: u64) {}
+    #[inline(always)]
+    fn clear_recv_wakers(&self, _seq: u64) {}
 }
 
 /// This defines interface of async receivers (for SelectSame)
@@ -59,7 +40,8 @@ where
     fn poll_item(
         &self, ctx: &mut Context, waker: &mut Option<LockedWaker>,
     ) -> Result<T, TryRecvError>;
-    fn clear_recv_wakers(&self, _waker: LockedWaker) {}
+    #[inline(always)]
+    fn clear_recv_wakers(&self, _seq: u64) {}
     fn on_send(&self) {}
 }
 

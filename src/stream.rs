@@ -1,4 +1,5 @@
-use crate::channel::{AsyncRx, LockedWaker};
+use crate::channel::AsyncRx;
+use crate::locked_waker::LockedWaker;
 use futures::stream;
 use std::pin::Pin;
 use std::task::*;

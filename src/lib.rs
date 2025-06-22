@@ -30,7 +30,7 @@
 //!
 //! let rt = tokio::runtime::Builder::new_multi_thread().enable_all().build().unwrap();
 //!
-//! let (tx, rx) = mpsc::bounded_future_both::<i32>(100);
+//! let (tx, rx) = mpsc::bounded_async::<i32>(100);
 //!
 //! rt.block_on(async move {
 //!    tokio::spawn(async move {
@@ -61,7 +61,7 @@
 //! Supports stable Rust. Mainly tested on tokio-0.2 (Not tried on async-std or other runtime).
 //! future::selects and timeout work fine, but it takes advantage of runtime behavior not documented by Rust official.
 //!
-//! Refer to https://github.com/rust-lang/rust/issues/73002
+//! Refer to <https://github.com/rust-lang/rust/issues/73002>
 //!
 //! ## Memory overhead
 //! While using mp tx or mp rx, there's memory overhead to pass along wakers for pending async producer or consumer.
@@ -71,17 +71,23 @@
 //! currently there's hard coded threshold to clean up those canceled wakers.
 
 extern crate crossbeam;
-#[macro_use]
-extern crate async_trait;
 extern crate futures;
+#[macro_use]
+extern crate enum_dispatch;
 
-pub mod channel;
-#[macro_use]
-pub mod mpmc;
-#[macro_use]
-pub mod mpsc;
+mod channel;
 mod locked_waker;
+pub mod mpmc;
+pub mod mpsc;
+mod recv_wakers;
+mod send_wakers;
 pub use locked_waker::LockedWaker;
+mod rx;
+pub use rx::*;
+mod m_rx;
+pub use m_rx::*;
 pub mod stream;
-
-pub use crossbeam::channel::{RecvError, SendError, TryRecvError, TrySendError};
+mod tx;
+pub use tx::*;
+mod m_tx;
+pub use m_tx::*;

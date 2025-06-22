@@ -1,4 +1,5 @@
 use crate::channel::*;
+use crate::stream::Stream;
 use crossbeam::channel::{Receiver, RecvError, TryRecvError};
 use std::future::Future;
 use std::pin::Pin;

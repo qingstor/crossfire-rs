@@ -1,11 +1,6 @@
-mod locked_waker;
-mod select;
-mod stream;
+pub use crate::locked_waker::*;
 use crossbeam::channel::{RecvError, TryRecvError};
-pub use locked_waker::*;
-pub use select::SelectSame;
 use std::task::Context;
-pub use stream::Stream;
 
 /// This defines interface for mpmc channel shared state
 pub trait MPMCShared: Sync + Send {
@@ -98,6 +93,7 @@ macro_rules! clear_sender_wakers_common {
         }
     }};
 }
+pub(super) use clear_sender_wakers_common;
 
 macro_rules! clear_recv_wakers_common {
     ($self: expr, $seq: expr) => {{
@@ -129,94 +125,7 @@ macro_rules! clear_recv_wakers_common {
         }
     }};
 }
-
-macro_rules! reg_send_m {
-    ($self: expr, $ctx: expr) => {{
-        let seq = $self.send_waker_tx_seq.fetch_add(1, Ordering::SeqCst);
-        let waker = LockedWaker::new($ctx, seq);
-        let _ = $self.sender_waker.push(waker.weak());
-        if $self.rx_count.load(Ordering::SeqCst) == 0 {
-            // XXX atomic order?
-            waker.cancel();
-            return None;
-        } else {
-            return Some(waker);
-        }
-    }};
-}
-
-macro_rules! reg_recv_s {
-    ($self: expr, $ctx: expr) => {{
-        let waker = LockedWaker::new($ctx, 0);
-        let _ = $self.recv_waker.push(waker.weak());
-        if $self.tx_count.load(Ordering::SeqCst) == 0 {
-            // no one is sending
-            waker.cancel();
-            return None;
-        } else {
-            return Some(waker);
-        }
-    }};
-}
-
-macro_rules! reg_recv_m {
-    ($self: expr, $ctx: expr) => {{
-        let seq = $self.recv_waker_tx_seq.fetch_add(1, Ordering::SeqCst);
-        let waker = LockedWaker::new($ctx, seq);
-        let _ = $self.recv_waker.push(waker.weak());
-        if $self.tx_count.load(Ordering::SeqCst) == 0 {
-            // no one is sending
-            waker.cancel();
-            return None;
-        } else {
-            return Some(waker);
-        }
-    }};
-}
-
-macro_rules! on_recv_m {
-    ($self: expr) => {{
-        loop {
-            if let Some(waker) = $self.sender_waker.pop() {
-                let _seq = $self.send_waker_rx_seq.fetch_add(1, Ordering::SeqCst);
-                if waker.wake() {
-                    return;
-                }
-            } else {
-                return;
-            }
-        }
-    }};
-}
-
-macro_rules! on_send_m {
-    ($self: expr) => {{
-        loop {
-            if let Some(waker) = $self.recv_waker.pop() {
-                let _seq = $self.recv_waker_rx_seq.fetch_add(1, Ordering::SeqCst);
-                if waker.wake() {
-                    return;
-                }
-            } else {
-                return;
-            }
-        }
-    }};
-}
-
-macro_rules! on_send_s {
-    ($self: expr) => {{
-        loop {
-            if let Some(waker) = $self.recv_waker.pop() {
-                if waker.wake() {
-                    return;
-                }
-            } else {
-                return;
-            }
-        }
-    }};
-}
+pub(super) use clear_recv_wakers_common;
 
 macro_rules! close_tx_common {
     ($self: expr) => {{
@@ -233,6 +142,7 @@ macro_rules! close_tx_common {
         }
     }};
 }
+pub(super) use close_tx_common;
 
 macro_rules! close_rx_common {
     ($self: expr) => {{
@@ -249,3 +159,4 @@ macro_rules! close_rx_common {
         }
     }};
 }
+pub(super) use close_rx_common;

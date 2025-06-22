@@ -1,5 +1,4 @@
-use super::rx::*;
-use super::tx::*;
+use super::*;
 use crate::channel::*;
 use crossbeam::queue::{ArrayQueue, SegQueue};
 use std::sync::{

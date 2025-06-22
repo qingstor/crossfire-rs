@@ -75,9 +75,14 @@ extern crate crossbeam;
 extern crate async_trait;
 extern crate futures;
 
-#[macro_use]
 pub mod channel;
+#[macro_use]
 pub mod mpmc;
+#[macro_use]
 pub mod mpsc;
+mod locked_waker;
+pub use locked_waker::LockedWaker;
+pub mod select;
+pub mod stream;
 
 pub use crossbeam::channel::{RecvError, SendError, TryRecvError, TrySendError};

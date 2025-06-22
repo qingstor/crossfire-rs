@@ -82,7 +82,6 @@ pub mod mpmc;
 pub mod mpsc;
 mod locked_waker;
 pub use locked_waker::LockedWaker;
-pub mod select;
 pub mod stream;
 
 pub use crossbeam::channel::{RecvError, SendError, TryRecvError, TrySendError};

@@ -1,34 +1,31 @@
-use crate::channel::AsyncRx;
 use crate::locked_waker::LockedWaker;
+use crate::rx::AsyncRx;
 use futures::stream;
 use std::pin::Pin;
 use std::task::*;
 
-pub struct Stream<T, R>
+pub struct AsyncStream<T>
 where
     T: Unpin + Send + Sync + 'static,
-    R: AsyncRx<T>,
 {
-    rx: R,
+    rx: AsyncRx<T>,
     waker: Option<LockedWaker>,
     phan: std::marker::PhantomData<T>,
     ended: bool,
 }
 
-impl<T, R> Stream<T, R>
+impl<T> AsyncStream<T>
 where
     T: Unpin + Send + Sync + 'static,
-    R: AsyncRx<T>,
 {
-    pub fn new(rx: R) -> Self {
+    pub fn new(rx: AsyncRx<T>) -> Self {
         Self { rx, waker: None, phan: Default::default(), ended: false }
     }
 }
 
-impl<T, R> stream::Stream for Stream<T, R>
+impl<T> stream::Stream for AsyncStream<T>
 where
     T: Unpin + Send + Sync + 'static,
-    R: AsyncRx<T> + Unpin,
 {
     type Item = T;
 
@@ -47,24 +44,22 @@ where
     }
 }
 
-impl<T, R> stream::FusedStream for Stream<T, R>
+impl<T> stream::FusedStream for AsyncStream<T>
 where
     T: Unpin + Send + Sync + 'static,
-    R: AsyncRx<T> + Unpin,
 {
     fn is_terminated(&self) -> bool {
         self.ended
     }
 }
 
-impl<T, R> Drop for Stream<T, R>
+impl<T> Drop for AsyncStream<T>
 where
     T: Unpin + Send + Sync + 'static,
-    R: AsyncRx<T>,
 {
     fn drop(&mut self) {
         if let Some(waker) = self.waker.take() {
-            self.rx.clear_recv_wakers(waker.get_seq());
+            self.rx.shared.clear_recv_wakers(waker.get_seq());
         }
     }
 }
@@ -72,6 +67,7 @@ where
 #[cfg(test)]
 mod tests {
 
+    use crate::*;
     use futures::stream::{FusedStream, StreamExt};
 
     #[test]
@@ -84,7 +80,7 @@ mod tests {
             .unwrap();
         rt.block_on(async move {
             let total_message = 100;
-            let (tx, rx) = crate::mpmc::bounded_future_both::<i32>(2);
+            let (tx, rx) = crate::mpmc::bounded_async::<i32>(2);
             tokio::spawn(async move {
                 println!("sender thread send {} message start", total_message);
                 for i in 0i32..total_message {

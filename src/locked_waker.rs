@@ -1,3 +1,4 @@
+use std::fmt;
 use std::sync::{
     Arc, Weak,
     atomic::{AtomicBool, Ordering},
@@ -5,6 +6,19 @@ use std::sync::{
 use std::task::*;
 
 pub struct LockedWaker(Arc<LockedWakerInner>);
+
+impl fmt::Debug for LockedWaker {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let _self = self.0.as_ref();
+        write!(
+            f,
+            "LockedWaker(seq={}, locked={}, waked={})",
+            _self.seq,
+            _self.locked.load(Ordering::Acquire),
+            _self.waked.load(Ordering::Acquire)
+        )
+    }
+}
 
 struct LockedWakerInner {
     locked: AtomicBool,
@@ -20,6 +34,12 @@ impl Clone for LockedWaker {
 }
 
 pub struct LockedWakerRef(Weak<LockedWakerInner>);
+
+impl fmt::Debug for LockedWakerRef {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "LockedWakerRef")
+    }
+}
 
 impl LockedWaker {
     #[inline(always)]

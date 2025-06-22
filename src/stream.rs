@@ -64,7 +64,7 @@ where
 {
     fn drop(&mut self) {
         if let Some(waker) = self.waker.take() {
-            self.rx.clear_recv_wakers(waker);
+            self.rx.clear_recv_wakers(waker.get_seq());
         }
     }
 }

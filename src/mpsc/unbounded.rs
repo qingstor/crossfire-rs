@@ -26,9 +26,9 @@ pub struct UnboundedSharedFuture {
     recv_waker: ArrayQueue<LockedWakerRef>,
 }
 
-impl MPSCShared for UnboundedSharedFuture {
+impl ChannelShared for UnboundedSharedFuture {
     #[inline]
-    fn cancel_recv_reg(&self) {
+    fn clear_recv_wakers(&self, _seq: u64) {
         let _ = self.recv_waker.pop();
     }
 

@@ -54,9 +54,9 @@ pub struct SharedFutureBoth {
     checking_sender: AtomicBool,
 }
 
-impl MPSCShared for SharedFutureBoth {
+impl ChannelShared for SharedFutureBoth {
     #[inline]
-    fn cancel_recv_reg(&self) {
+    fn clear_recv_wakers(&self, _seq: u64) {
         let _ = self.recv_waker.pop();
     }
 
@@ -117,8 +117,8 @@ impl MPSCShared for SharedFutureBoth {
     }
 
     #[inline]
-    fn clear_send_wakers(&self, waker: LockedWaker) {
-        clear_sender_wakers_common!(self, waker.get_seq())
+    fn clear_send_wakers(&self, seq: u64) {
+        clear_sender_wakers_common!(self, seq)
     }
 }
 
@@ -128,9 +128,9 @@ pub struct SharedSenderBRecvF {
     recv_waker: ArrayQueue<LockedWakerRef>,
 }
 
-impl MPSCShared for SharedSenderBRecvF {
+impl ChannelShared for SharedSenderBRecvF {
     #[inline]
-    fn cancel_recv_reg(&self) {
+    fn clear_recv_wakers(&self, _seq: u64) {
         let _ = self.recv_waker.pop();
     }
 
@@ -194,9 +194,9 @@ pub struct SharedSenderFRecvB {
     checking_sender: AtomicBool,
 }
 
-impl MPSCShared for SharedSenderFRecvB {
+impl ChannelShared for SharedSenderFRecvB {
     #[inline]
-    fn cancel_recv_reg(&self) {}
+    fn clear_recv_wakers(&self, _seq: u64) {}
 
     fn new() -> Self {
         Self {
@@ -262,8 +262,8 @@ impl MPSCShared for SharedSenderFRecvB {
     }
 
     #[inline]
-    fn clear_send_wakers(&self, waker: LockedWaker) {
-        clear_sender_wakers_common!(self, waker.get_seq())
+    fn clear_send_wakers(&self, seq: u64) {
+        clear_sender_wakers_common!(self, seq)
     }
 }
 

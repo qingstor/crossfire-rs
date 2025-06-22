@@ -30,7 +30,7 @@ pub struct UnboundedSharedFuture {
     checking_recv: AtomicBool,
 }
 
-impl MPMCShared for UnboundedSharedFuture {
+impl ChannelShared for UnboundedSharedFuture {
     fn new() -> Self {
         Self {
             recv_waker: SegQueue::new(),
@@ -91,8 +91,8 @@ impl MPMCShared for UnboundedSharedFuture {
     }
 
     #[inline]
-    fn clear_recv_wakers(&self, waker: LockedWaker) {
-        clear_recv_wakers_common!(self, waker.get_seq())
+    fn clear_recv_wakers(&self, seq: u64) {
+        clear_recv_wakers_common!(self, seq)
     }
 }
 

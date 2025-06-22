@@ -7,18 +7,18 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 
 /// Receiver that dose not support async
-pub struct RxBlocking<T, S: MPSCShared> {
+pub struct RxBlocking<T, S: ChannelShared> {
     recv: Receiver<T>,
     shared: Arc<S>,
 }
 
-impl<T, S: MPSCShared> Drop for RxBlocking<T, S> {
+impl<T, S: ChannelShared> Drop for RxBlocking<T, S> {
     fn drop(&mut self) {
         self.shared.close_rx();
     }
 }
 
-impl<T, S: MPSCShared> RxBlocking<T, S> {
+impl<T, S: ChannelShared> RxBlocking<T, S> {
     #[inline]
     pub(crate) fn new(recv: Receiver<T>, shared: Arc<S>) -> Self {
         Self { recv, shared }
@@ -76,18 +76,18 @@ impl<T, S: MPSCShared> RxBlocking<T, S> {
 }
 
 /// Receiver that supports async
-pub struct RxFuture<T, S: MPSCShared> {
+pub struct RxFuture<T, S: ChannelShared> {
     recv: Receiver<T>,
     shared: Arc<S>,
 }
 
-impl<T, S: MPSCShared> Drop for RxFuture<T, S> {
+impl<T, S: ChannelShared> Drop for RxFuture<T, S> {
     fn drop(&mut self) {
         self.shared.close_rx();
     }
 }
 
-impl<T, S: MPSCShared> RxFuture<T, S> {
+impl<T, S: ChannelShared> RxFuture<T, S> {
     #[inline]
     pub(crate) fn new(recv: Receiver<T>, shared: Arc<S>) -> Self {
         Self { recv, shared }
@@ -185,7 +185,7 @@ impl<T, S: MPSCShared> RxFuture<T, S> {
                 return Ok(item);
             }
         }
-        self.shared.cancel_recv_reg();
+        self.shared.clear_recv_wakers(0);
         if let Some(_waker) = self.shared.reg_recv(ctx) {
             match self.recv.try_recv() {
                 Err(e) => {
@@ -194,13 +194,13 @@ impl<T, S: MPSCShared> RxFuture<T, S> {
                         waker.replace(_waker);
                         return Err(e);
                     }
-                    self.shared.cancel_recv_reg();
+                    self.shared.clear_recv_wakers(0);
                     return Err(e);
                 }
                 Ok(item) => {
                     _waker.cancel();
                     self.shared.on_recv();
-                    self.shared.cancel_recv_reg();
+                    self.shared.clear_recv_wakers(0);
                     // should unlock before on receive
                     return Ok(item);
                 }
@@ -226,7 +226,7 @@ impl<T, S: MPSCShared> RxFuture<T, S> {
 }
 
 #[async_trait]
-impl<'a, T: Send + Sync + 'static, S: MPSCShared> AsyncRx<T> for RxFuture<T, S> {
+impl<'a, T: Send + Sync + 'static, S: ChannelShared> AsyncRx<T> for RxFuture<T, S> {
     #[inline(always)]
     fn poll_item(
         &self, ctx: &mut Context, waker: &mut Option<LockedWaker>,
@@ -248,23 +248,19 @@ impl<'a, T: Send + Sync + 'static, S: MPSCShared> AsyncRx<T> for RxFuture<T, S> 
     fn is_empty(&self) -> bool {
         self.recv.is_empty()
     }
+
+    #[inline(always)]
+    fn clear_recv_wakers(&self, seq: u64) {
+        self.shared.clear_recv_wakers(seq)
+    }
 }
 
-pub struct ReceiveFuture<'a, T, S: MPSCShared> {
+pub struct ReceiveFuture<'a, T, S: ChannelShared> {
     rx: &'a RxFuture<T, S>,
     waker: Option<LockedWaker>,
 }
 
-impl<T, S: MPSCShared> ReceiveFuture<'_, T, S> {
-    // Take waker to save outside, so that waker will not be dropped (canceled).
-    // You may need to try_recv or make another ReceiveFuture once woke up.
-    #[inline]
-    pub fn take_waker(&mut self) -> Option<LockedWaker> {
-        self.waker.take()
-    }
-}
-
-impl<T, S: MPSCShared> Future for ReceiveFuture<'_, T, S> {
+impl<T, S: ChannelShared> Future for ReceiveFuture<'_, T, S> {
     type Output = Result<T, RecvError>;
 
     fn poll(self: Pin<&mut Self>, ctx: &mut Context) -> Poll<Self::Output> {
@@ -283,7 +279,7 @@ impl<T, S: MPSCShared> Future for ReceiveFuture<'_, T, S> {
     }
 }
 
-impl<T, S: MPSCShared> Drop for ReceiveFuture<'_, T, S> {
+impl<T, S: ChannelShared> Drop for ReceiveFuture<'_, T, S> {
     fn drop(&mut self) {
         if let Some(waker) = self.waker.take() {
             waker.abandon();

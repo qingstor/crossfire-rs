@@ -1,11 +1,12 @@
 use crate::locked_waker::*;
-use crossbeam::queue::SegQueue;
+use crossbeam::queue::{ArrayQueue, SegQueue};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::task::Context;
 
 #[enum_dispatch(SendWakersTrait)]
 pub enum SendWakers {
     Blocking(SendWakersBlocking),
+    Single(SendWakersSingle),
     Multi(SendWakersMulti),
 }
 
@@ -53,6 +54,53 @@ impl SendWakersTrait for SendWakersBlocking {
     }
 }
 
+pub struct SendWakersSingle {
+    sender_waker: ArrayQueue<LockedWakerRef>,
+}
+
+impl SendWakersSingle {
+    #[inline(always)]
+    pub fn new() -> SendWakers {
+        SendWakers::Single(Self { sender_waker: ArrayQueue::new(1) })
+    }
+}
+
+impl SendWakersTrait for SendWakersSingle {
+    #[inline(always)]
+    fn reg_send(&self, ctx: &mut Context) -> LockedWaker {
+        let waker = LockedWaker::new(ctx, 0);
+        let weak = waker.weak();
+        match self.sender_waker.push(weak) {
+            Ok(_) => {}
+            Err(_weak) => {
+                let _old_waker = self.sender_waker.pop();
+                self.sender_waker.push(_weak).expect("push wake ok after pop");
+            }
+        }
+        waker
+    }
+
+    #[inline(always)]
+    fn clear_send_wakers(&self, _seq: u64, _limit: u64) {}
+
+    #[inline(always)]
+    fn on_recv(&self) {
+        if let Some(waker) = self.sender_waker.pop() {
+            waker.wake();
+        }
+    }
+
+    #[inline]
+    fn close(&self) {
+        self.on_recv();
+    }
+
+    /// return waker queue size
+    fn get_size(&self) -> usize {
+        0
+    }
+}
+
 pub struct SendWakersMulti {
     sender_waker: SegQueue<LockedWakerRef>,
     send_waker_tx_seq: AtomicU64,
@@ -73,7 +121,7 @@ impl SendWakersMulti {
 }
 
 impl SendWakersTrait for SendWakersMulti {
-    #[inline]
+    #[inline(always)]
     fn reg_send(&self, ctx: &mut Context) -> LockedWaker {
         let seq = self.send_waker_tx_seq.fetch_add(1, Ordering::SeqCst);
         let waker = LockedWaker::new(ctx, seq);
@@ -81,7 +129,7 @@ impl SendWakersTrait for SendWakersMulti {
         waker
     }
 
-    #[inline]
+    #[inline(always)]
     fn clear_send_wakers(&self, seq: u64, limit: u64) {
         if seq & 15 != 0 {
             return;
@@ -110,7 +158,7 @@ impl SendWakersTrait for SendWakersMulti {
         }
     }
 
-    #[inline]
+    #[inline(always)]
     fn on_recv(&self) {
         loop {
             if let Some(waker) = self.sender_waker.pop() {

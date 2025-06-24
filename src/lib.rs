@@ -77,10 +77,14 @@ extern crate enum_dispatch;
 
 mod channel;
 mod locked_waker;
+/// Multi producers, single consumer
 pub mod mpmc;
+/// Multi producers, multi consumers
 pub mod mpsc;
 mod recv_wakers;
 mod send_wakers;
+/// Single producer, single consumer
+pub mod spsc;
 pub use locked_waker::LockedWaker;
 mod rx;
 pub use rx::*;

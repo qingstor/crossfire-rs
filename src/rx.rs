@@ -170,18 +170,24 @@ impl<T> AsyncRx<T> {
     ) -> Result<T, TryRecvError> {
         match self.recv.try_recv() {
             Err(e) => {
-                if !e.is_empty() {
+                if e.is_empty() {
+                    if let Some(old_waker) = waker.as_ref() {
+                        if old_waker.is_waked() {
+                            let _ = waker.take(); // should reg again
+                        } else {
+                            // False wake up
+                            if self.shared.get_tx_count() == 0 {
+                                // Check channel close before sleep
+                                return Err(TryRecvError::Disconnected);
+                            }
+                            return Err(e);
+                        }
+                    }
+                } else {
                     if let Some(old_waker) = waker.take() {
                         old_waker.abandon();
                     }
                     return Err(e);
-                }
-                if let Some(old_waker) = waker.as_ref() {
-                    if old_waker.is_waked() {
-                        let _ = waker.take(); // should reg again
-                    } else {
-                        return Err(e);
-                    }
                 }
             }
             Ok(item) => {
@@ -194,14 +200,19 @@ impl<T> AsyncRx<T> {
         }
         let _waker = self.shared.reg_recv(ctx);
         match self.recv.try_recv() {
-            Err(e) => {
-                if e.is_empty() {
-                    _waker.commit();
-                    waker.replace(_waker);
-                } else {
-                    _waker.cancel();
+            Err(TryRecvError::Empty) => {
+                _waker.commit();
+                waker.replace(_waker);
+                if self.shared.get_tx_count() == 0 {
+                    // Check channel close before sleep, otherwise might block forever
+                    // Confirmed by test_presure_1_tx_blocking_1_rx_async()
+                    return Err(TryRecvError::Disconnected);
                 }
-                return Err(e);
+                return Err(TryRecvError::Empty);
+            }
+            Err(TryRecvError::Disconnected) => {
+                _waker.cancel();
+                return Err(TryRecvError::Disconnected);
             }
             Ok(item) => {
                 if !_waker.is_waked() {

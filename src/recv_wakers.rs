@@ -97,7 +97,7 @@ impl RecvWakersTrait for RecvWakersSingle {
 
     /// return waker queue size
     fn get_size(&self) -> usize {
-        self.recv_waker.len()
+        0
     }
 }
 

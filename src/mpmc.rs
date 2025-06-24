@@ -1,3 +1,4 @@
+/// Multi producers, multi consumers
 use crate::channel::*;
 use crate::m_rx::*;
 use crate::m_tx::*;

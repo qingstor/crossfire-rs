@@ -95,3 +95,6 @@ mod tx;
 pub use tx::*;
 mod m_tx;
 pub use m_tx::*;
+
+#[cfg(test)]
+mod tests;

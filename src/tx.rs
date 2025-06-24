@@ -158,6 +158,11 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
                     if old_waker.is_waked() {
                         let _ = waker.take(); // reg again
                     } else {
+                        // False wakeup
+                        if self.shared.get_rx_count() == 0 {
+                            // Check channel close before sleep
+                            return Err(TrySendError::Disconnected(t));
+                        }
                         return Err(TrySendError::Full(t));
                     }
                 }
@@ -183,6 +188,11 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
             Err(TrySendError::Full(t)) => {
                 _waker.commit();
                 waker.replace(_waker);
+                if self.shared.get_rx_count() == 0 {
+                    // Check channel close before sleep, otherwise might block forever
+                    // Confirmed by test_presure_1_tx_blocking_1_rx_async()
+                    return Err(TrySendError::Disconnected(t));
+                }
                 return Err(TrySendError::Full(t));
             }
             Err(TrySendError::Disconnected(t)) => {

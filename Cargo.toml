@@ -28,3 +28,10 @@ rstest = "0"
 log = "0"
 captains-log = "0"
 atomic-waitgroup = "0"
+criterion = { version="0.6", features = ["async_tokio", "csv_output"] }
+
+flume = {version="0.11", features= ["async"] }
+
+[[bench]]
+name = "crossfire_bench"
+harness = false

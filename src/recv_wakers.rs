@@ -16,6 +16,8 @@ pub trait RecvWakersTrait {
 
     fn clear_recv_wakers(&self, _seq: u64);
 
+    fn cancel_recv_waker(&self, _waker: LockedWaker);
+
     fn on_send(&self);
 
     fn close(&self);
@@ -36,6 +38,11 @@ impl RecvWakersBlocking {
 impl RecvWakersTrait for RecvWakersBlocking {
     #[inline(always)]
     fn reg_recv(&self, _ctx: &mut Context) -> LockedWaker {
+        unreachable!();
+    }
+
+    #[inline(always)]
+    fn cancel_recv_waker(&self, _waker: LockedWaker) {
         unreachable!();
     }
 
@@ -81,9 +88,18 @@ impl RecvWakersTrait for RecvWakersSingle {
     }
 
     #[inline(always)]
-    fn clear_recv_wakers(&self, _seq: u64) {}
+    fn cancel_recv_waker(&self, _waker: LockedWaker) {
+        // Got to be it, because only one single thread.
+        let _ = self.recv_waker.pop();
+    }
 
-    #[inline]
+    #[inline(always)]
+    fn clear_recv_wakers(&self, _seq: u64) {
+        // Got to be it, because only one single thread.
+        let _ = self.recv_waker.pop();
+    }
+
+    #[inline(always)]
     fn on_send(&self) {
         if let Some(waker) = self.recv_waker.pop() {
             waker.wake();
@@ -127,9 +143,15 @@ impl RecvWakersTrait for RecvWakersMulti {
         waker
     }
 
+    #[inline(always)]
+    fn cancel_recv_waker(&self, waker: LockedWaker) {
+        // Just abandon and leave it to on_send() to clean it
+        waker.abandon();
+    }
+
     /// Call when ReceiveFuture is cancelled.
     /// to clear the LockedWakerRef which has been sent to the other side.
-    #[inline]
+    #[inline(always)]
     fn clear_recv_wakers(&self, seq: u64) {
         if self.checking_recv.swap(true, Ordering::SeqCst) {
             // Other thread is cleaning
@@ -144,14 +166,10 @@ impl RecvWakersTrait for RecvWakersMulti {
         self.checking_recv.store(false, Ordering::Release);
     }
 
-    #[inline]
+    #[inline(always)]
     fn on_send(&self) {
-        loop {
-            if let Some(waker) = self.recv_waker.pop() {
-                if waker.wake() {
-                    return;
-                }
-            } else {
+        while let Some(waker) = self.recv_waker.pop() {
+            if waker.wake() {
                 return;
             }
         }

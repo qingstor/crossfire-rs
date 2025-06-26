@@ -187,33 +187,25 @@ impl<T> AsyncRx<T> {
             }
         } else {
             if let Some(old_waker) = o_waker.take() {
-                old_waker.abandon();
+                self.shared.cancel_recv_waker(old_waker);
             }
             return r;
         }
         let waker = self.shared.reg_recv(ctx);
         // NOTE: The other side put something whie reg_send and did not see the waker,
         // should check the channel again, otherwise might incur a dead lock.
-        match self.recv.try_recv() {
-            Err(TryRecvError::Empty) => {
-                o_waker.replace(waker);
-                if self.shared.get_tx_count() == 0 {
-                    // Check channel close before sleep, otherwise might block forever
-                    // Confirmed by test_presure_1_tx_blocking_1_rx_async()
-                    return Err(TryRecvError::Disconnected);
-                }
-                return Err(TryRecvError::Empty);
-            }
-            Err(TryRecvError::Disconnected) => {
-                waker.abandon();
+        let r = self.try_recv();
+        if let Err(TryRecvError::Empty) = &r {
+            if self.shared.get_tx_count() == 0 {
+                // Check channel close before sleep, otherwise might block forever
+                // Confirmed by test_presure_1_tx_blocking_1_rx_async()
                 return Err(TryRecvError::Disconnected);
             }
-            Ok(item) => {
-                self.shared.on_recv();
-                waker.abandon();
-                return Ok(item);
-            }
+            o_waker.replace(waker);
+        } else {
+            self.shared.cancel_recv_waker(waker);
         }
+        return r;
     }
 
     pub fn into_stream(self) -> AsyncStream<T>
@@ -241,10 +233,8 @@ impl<T> Drop for ReceiveFuture<'_, T> {
         if let Some(waker) = self.waker.take() {
             // Cancelling the future, poll is not ready
             if waker.abandon() {
-                // We are waked, but giving up to recv, should notify another receiver
-                if !self.rx.recv.is_empty() {
-                    self.rx.shared.on_send();
-                }
+                // We are waked, but giving up to recv, should notify another receiver for safty
+                self.rx.shared.on_send();
             } else {
                 self.rx.shared.clear_recv_wakers(waker.get_seq());
             }

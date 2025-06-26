@@ -59,12 +59,6 @@ impl ChannelShared {
         self.recvs.reg_recv(ctx)
     }
 
-    /// Clear dead wakers on rx queue
-    #[inline(always)]
-    pub fn clear_recv_wakers(&self, seq: u64) {
-        self.recvs.clear_recv_wakers(seq);
-    }
-
     /// Wake up one rx
     #[inline(always)]
     pub fn on_send(&self) {
@@ -83,9 +77,25 @@ impl ChannelShared {
         self.senders.on_recv()
     }
 
-    /// Clear dead wakers on sender queue
+    #[inline(always)]
+    pub fn cancel_recv_waker(&self, waker: LockedWaker) {
+        self.recvs.cancel_recv_waker(waker);
+    }
+
+    #[inline(always)]
+    pub fn cancel_send_waker(&self, waker: LockedWaker) {
+        self.senders.cancel_send_waker(waker);
+    }
+
+    /// On timeout, clear dead wakers on sender queue
     pub fn clear_send_wakers(&self, seq: u64) {
         self.senders.clear_send_wakers(seq);
+    }
+
+    /// On timeout, clear dead wakers on receiver queue
+    #[inline(always)]
+    pub fn clear_recv_wakers(&self, seq: u64) {
+        self.recvs.clear_recv_wakers(seq);
     }
 
     /// Just for debugging purpose, to monitor queue size

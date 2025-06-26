@@ -109,21 +109,21 @@ impl<T> AsyncRx<T> {
         Self { recv, shared }
     }
 
-    #[inline]
+    #[inline(always)]
     pub async fn recv(&self) -> Result<T, RecvError> {
         match self.try_recv() {
-            Err(e) => {
-                if e.is_empty() {
-                    return ReceiveFuture { rx: &self, waker: None }.await;
-                }
+            Err(TryRecvError::Disconnected) => {
                 return Err(RecvError {});
             }
             Ok(item) => return Ok(item),
+            _ => {
+                return ReceiveFuture { rx: &self, waker: None }.await;
+            }
         }
     }
 
     /// Receive a message while blocking the current thread. (If you know what you're doing)
-    #[inline]
+    #[inline(always)]
     pub fn recv_blocking(&self) -> Result<T, RecvError> {
         match self.recv.recv() {
             Err(e) => return Err(e),
@@ -134,7 +134,7 @@ impl<T> AsyncRx<T> {
         }
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn try_recv(&self) -> Result<T, TryRecvError> {
         match self.recv.try_recv() {
             Err(e) => return Err(e),
@@ -146,19 +146,19 @@ impl<T> AsyncRx<T> {
     }
 
     /// Generate a fixed Sized future object that receive a message
-    #[inline]
+    #[inline(always)]
     pub fn make_recv_future<'a>(&'a self) -> ReceiveFuture<'a, T> {
         return ReceiveFuture { rx: &self, waker: None };
     }
 
     /// Probe possible messages in the channel (not accurate)
-    #[inline]
+    #[inline(always)]
     pub fn len(&self) -> usize {
         self.recv.len()
     }
 
     /// Whether there's message in the channel (not accurate)
-    #[inline]
+    #[inline(always)]
     pub fn is_empty(&self) -> bool {
         self.recv.is_empty()
     }
@@ -166,46 +166,36 @@ impl<T> AsyncRx<T> {
     /// This is only useful when you're writing your own future
     #[inline(always)]
     pub fn poll_item(
-        &self, ctx: &mut Context, waker: &mut Option<LockedWaker>,
+        &self, ctx: &mut Context, o_waker: &mut Option<LockedWaker>,
     ) -> Result<T, TryRecvError> {
         // When the result is not TryRecvError::Empty,
         // make sure always take the o_waker out and abandon,
         // to skip the timeout cleaning logic in Drop.
-        match self.recv.try_recv() {
-            Err(e) => {
-                if e.is_empty() {
-                    if let Some(old_waker) = waker.as_ref() {
-                        if old_waker.is_waked() {
-                            let _ = waker.take(); // should reg again
-                        } else {
-                            // False wake up
-                            if self.shared.get_tx_count() == 0 {
-                                // Check channel close before sleep
-                                return Err(TryRecvError::Disconnected);
-                            }
-                            return Err(e);
-                        }
-                    }
+        let r = self.try_recv();
+        if let Err(TryRecvError::Empty) = &r {
+            if let Some(old_waker) = o_waker.as_ref() {
+                if old_waker.is_waked() {
+                    let _ = o_waker.take(); // should reg again
                 } else {
-                    if let Some(old_waker) = waker.take() {
-                        old_waker.abandon(false);
+                    if self.shared.get_tx_count() == 0 {
+                        // Check channel close before sleep
+                        return Err(TryRecvError::Disconnected);
                     }
-                    return Err(e);
+                    // False wake up, sleep again
+                    return Err(TryRecvError::Empty);
                 }
             }
-            Ok(item) => {
-                self.shared.on_recv();
-                if let Some(old_waker) = waker.take() {
-                    old_waker.abandon(false);
-                }
-                return Ok(item);
+        } else {
+            if let Some(old_waker) = o_waker.take() {
+                old_waker.abandon(false);
             }
+            return r;
         }
-        let _waker = self.shared.reg_recv(ctx);
+        let waker = self.shared.reg_recv(ctx);
         match self.recv.try_recv() {
             Err(TryRecvError::Empty) => {
-                _waker.commit();
-                waker.replace(_waker);
+                waker.commit();
+                o_waker.replace(waker);
                 if self.shared.get_tx_count() == 0 {
                     // Check channel close before sleep, otherwise might block forever
                     // Confirmed by test_presure_1_tx_blocking_1_rx_async()
@@ -214,11 +204,12 @@ impl<T> AsyncRx<T> {
                 return Err(TryRecvError::Empty);
             }
             Err(TryRecvError::Disconnected) => {
-                _waker.abandon(true);
+                waker.abandon(true);
                 return Err(TryRecvError::Disconnected);
             }
             Ok(item) => {
-                _waker.abandon(true);
+                // NOTE: Do not use on_recv before abandon, might incur a dead lock
+                waker.abandon(true);
                 self.shared.on_recv();
                 return Ok(item);
             }

@@ -34,6 +34,11 @@ impl<T> Rx<T> {
         Self { recv, shared }
     }
 
+    /// Receive message, will block when channel is empty.
+    ///
+    /// Returns Ok(T) when successful.
+    ///
+    /// Returns [RecvError] when all Tx dropped.
     #[inline]
     pub fn recv<'a>(&'a self) -> Result<T, RecvError> {
         match self.recv.recv() {
@@ -45,6 +50,13 @@ impl<T> Rx<T> {
         }
     }
 
+    /// Try to receive message, non-blocking.
+    ///
+    /// Returns Ok(T) when successful.
+    ///
+    /// Returns [TryRecvError::Empty] when channel is empty.
+    ///
+    /// returns [TryRecvError::Disconnected] when all Tx dropped.
     #[inline]
     pub fn try_recv(&self) -> Result<T, TryRecvError> {
         match self.recv.try_recv() {
@@ -67,17 +79,11 @@ impl<T> Rx<T> {
     pub fn is_empty(&self) -> bool {
         self.recv.is_empty()
     }
-
-    /// Return a crossbeam Receiver, you should make sure to call on_recv() after receiving a
-    /// message
-    /// (If you know what you're doing)
-    #[inline(always)]
-    pub fn raw(&self) -> &Receiver<T> {
-        &self.recv
-    }
 }
 
 /// Receiver that works in async context
+///
+/// **NOTE**: this is not clonable. If you need concurrent access, use [crate::MAsyncRx] instead.
 pub struct AsyncRx<T> {
     pub(crate) recv: Receiver<T>,
     pub(crate) shared: Arc<ChannelShared>,
@@ -109,6 +115,13 @@ impl<T> AsyncRx<T> {
         Self { recv, shared }
     }
 
+    /// Receive message, will await when channel is empty.
+    ///
+    /// Returns Ok(T) when successful.
+    ///
+    /// returns [RecvError] when all Tx dropped.
+    ///
+    /// **NOTE**: Do not call concurrently. If you need concurrent access, use [crate::MAsyncRx::recv()] instead.
     #[inline(always)]
     pub async fn recv(&self) -> Result<T, RecvError> {
         match self.try_recv() {
@@ -134,6 +147,13 @@ impl<T> AsyncRx<T> {
         }
     }
 
+    /// Try to receive message, non-blocking.
+    ///
+    /// Returns Ok(T) on successful.
+    ///
+    /// Returns [TryRecvError::Empty] when channel is empty.
+    ///
+    /// Returns [TryRecvError::Disconnected] when all Tx dropped.
     #[inline(always)]
     pub fn try_recv(&self) -> Result<T, TryRecvError> {
         match self.recv.try_recv() {
@@ -163,7 +183,13 @@ impl<T> AsyncRx<T> {
         self.recv.is_empty()
     }
 
-    /// This is only useful when you're writing your own future
+    /// This is only useful when you're writing your own future.
+    ///
+    /// Returns Ok(T) on receiving message.
+    ///
+    /// Return Err([TryRecvError::Empty]) for Poll::Pending case.
+    ///
+    /// Return Err([TryRecvError::Disconnected]) when all Tx dropped.
     #[inline(always)]
     pub fn poll_item(
         &self, ctx: &mut Context, o_waker: &mut Option<LockedWaker>,
@@ -223,6 +249,7 @@ impl<T> AsyncRx<T> {
     }
 }
 
+/// A fixed-sized future object contructed by [AsyncRx::make_recv_future()]
 pub struct ReceiveFuture<'a, T> {
     rx: &'a AsyncRx<T>,
     waker: Option<LockedWaker>,
@@ -276,8 +303,20 @@ impl<T> From<MAsyncRx<T>> for AsyncRx<T> {
 
 /// For writing generic code with MRx & Rx
 pub trait BlockingRxTrait<T: Send + 'static>: Send + 'static {
+    /// Receive message, will block when channel is empty.
+    ///
+    /// Returns Ok(T) when successful.
+    ///
+    /// Returns [RecvError] when all Tx dropped.
     fn recv<'a>(&'a self) -> Result<T, RecvError>;
 
+    /// Try to receive message, non-blocking.
+    ///
+    /// Returns Ok(T) when successful.
+    ///
+    /// Returns [TryRecvError::Empty] when channel is empty.
+    ///
+    /// Returns [TryRecvError::Disconnected] when all Tx dropped.
     fn try_recv(&self) -> Result<T, TryRecvError>;
 
     /// Probe possible messages in the channel (not accurate)
@@ -298,13 +337,11 @@ impl<T: Send + 'static> BlockingRxTrait<T> for Rx<T> {
         Rx::try_recv(self)
     }
 
-    /// Probe possible messages in the channel (not accurate)
     #[inline(always)]
     fn len(&self) -> usize {
         Rx::len(self)
     }
 
-    /// Whether there's message in the channel (not accurate)
     #[inline(always)]
     fn is_empty(&self) -> bool {
         Rx::is_empty(self)
@@ -314,8 +351,20 @@ impl<T: Send + 'static> BlockingRxTrait<T> for Rx<T> {
 /// For writing generic code with MAsyncRx & AsyncRx
 #[async_trait]
 pub trait AsyncRxTrait<T: Unpin + Send + 'static>: Send + Sync + 'static {
+    /// Receive message, will await when channel is empty.
+    ///
+    /// Returns Ok(T) when successful.
+    ///
+    /// returns [RecvError] when all Tx dropped.
     async fn recv(&self) -> Result<T, RecvError>;
 
+    /// Try to receive message, non-blocking.
+    ///
+    /// Returns Ok(T) when successful.
+    ///
+    /// Returns [TryRecvError::Empty] when channel is empty.
+    ///
+    /// Returns [TryRecvError::Disconnected] when all Tx dropped.
     fn try_recv(&self) -> Result<T, TryRecvError>;
 
     /// Generate a fixed Sized future object that receive a message
@@ -344,25 +393,21 @@ impl<T: Unpin + Send + 'static> AsyncRxTrait<T> for AsyncRx<T> {
         AsyncRx::try_recv(self)
     }
 
-    /// Generate a fixed Sized future object that receive a message
     #[inline(always)]
     fn make_recv_future<'a>(&'a self) -> ReceiveFuture<'a, T> {
         AsyncRx::make_recv_future(self)
     }
 
-    /// Probe possible messages in the channel (not accurate)
     #[inline(always)]
     fn len(&self) -> usize {
         AsyncRx::len(self)
     }
 
-    /// Whether there's message in the channel (not accurate)
     #[inline(always)]
     fn is_empty(&self) -> bool {
         AsyncRx::is_empty(self)
     }
 
-    /// Returns count of tx / rx wakers stored in channel for debug purpose
     #[inline(always)]
     #[cfg(test)]
     fn get_waker_size(&self) -> (usize, usize) {

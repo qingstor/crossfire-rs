@@ -62,8 +62,7 @@ impl ChannelShared {
     /// Clear dead wakers on rx queue
     #[inline(always)]
     pub fn clear_recv_wakers(&self, seq: u64) {
-        let rx_count = self.get_rx_count();
-        self.recvs.clear_recv_wakers(seq, rx_count as u64 + 100)
+        self.recvs.clear_recv_wakers(seq);
     }
 
     /// Wake up one rx
@@ -86,8 +85,7 @@ impl ChannelShared {
 
     /// Clear dead wakers on sender queue
     pub fn clear_send_wakers(&self, seq: u64) {
-        let tx_count = self.get_tx_count();
-        self.senders.clear_send_wakers(seq, tx_count as u64 + 100);
+        self.senders.clear_send_wakers(seq);
     }
 
     /// Just for debugging purpose, to monitor queue size

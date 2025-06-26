@@ -33,11 +33,14 @@ impl Clone for LockedWaker {
     }
 }
 
-pub struct LockedWakerRef(Weak<LockedWakerInner>);
+pub struct LockedWakerRef {
+    w: Weak<LockedWakerInner>,
+    seq: u64,
+}
 
 impl fmt::Debug for LockedWakerRef {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "LockedWakerRef")
+        write!(f, "LockedWakerRef({})", self.seq)
     }
 }
 
@@ -86,7 +89,7 @@ impl LockedWaker {
 
     #[inline(always)]
     pub(crate) fn weak(&self) -> LockedWakerRef {
-        LockedWakerRef(Arc::downgrade(&self.0))
+        LockedWakerRef { seq: self.0.seq, w: Arc::downgrade(&self.0) }
     }
 
     #[inline]
@@ -94,11 +97,7 @@ impl LockedWaker {
         self.0.waked.load(Ordering::Acquire)
     }
 
-    #[inline(always)]
-    pub fn is_canceled(&self) -> bool {
-        self.0.waked.load(Ordering::Acquire)
-    }
-
+    /// return true on suc wake up, false when already woken up.
     #[inline]
     pub(crate) fn wake(&self) -> bool {
         let _self = self.0.as_ref();
@@ -118,21 +117,29 @@ impl LockedWaker {
 impl LockedWakerRef {
     #[inline(always)]
     pub(crate) fn wake(&self) -> bool {
-        if let Some(_self) = self.0.upgrade() {
+        if let Some(_self) = self.w.upgrade() {
             return LockedWaker(_self).wake();
         } else {
             return false;
         }
     }
 
-    pub(crate) fn upgrade(&self) -> Option<LockedWaker> {
-        if let Some(_self) = self.0.upgrade() {
-            if _self.waked.load(Ordering::Acquire) {
-                return None;
-            }
-            return Some(LockedWaker(_self));
+    /// return true to stop; return false to continue the search.
+    pub(crate) fn try_to_clear(&self, seq: u64) -> bool {
+        if self.seq == seq {
+            // It's my waker, stopped
+            return true;
         }
-        return None;
+        if let Some(w) = self.w.upgrade() {
+            let waker = LockedWaker(w);
+            if !waker.is_waked() {
+                waker.wake();
+                // other future is before me, but not canceled, i should stop.
+                // we do not known push back may have concurrent problem
+                return true;
+            }
+        }
+        return self.seq > seq;
     }
 }
 

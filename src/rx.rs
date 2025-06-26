@@ -168,6 +168,9 @@ impl<T> AsyncRx<T> {
     pub fn poll_item(
         &self, ctx: &mut Context, waker: &mut Option<LockedWaker>,
     ) -> Result<T, TryRecvError> {
+        // When the result is not TryRecvError::Empty,
+        // make sure always take the o_waker out and abandon,
+        // to skip the timeout cleaning logic in Drop.
         match self.recv.try_recv() {
             Err(e) => {
                 if e.is_empty() {
@@ -185,7 +188,7 @@ impl<T> AsyncRx<T> {
                     }
                 } else {
                     if let Some(old_waker) = waker.take() {
-                        old_waker.abandon();
+                        old_waker.abandon(false);
                     }
                     return Err(e);
                 }
@@ -193,7 +196,7 @@ impl<T> AsyncRx<T> {
             Ok(item) => {
                 self.shared.on_recv();
                 if let Some(old_waker) = waker.take() {
-                    old_waker.abandon();
+                    old_waker.abandon(false);
                 }
                 return Ok(item);
             }
@@ -211,13 +214,11 @@ impl<T> AsyncRx<T> {
                 return Err(TryRecvError::Empty);
             }
             Err(TryRecvError::Disconnected) => {
-                _waker.cancel();
+                _waker.abandon(true);
                 return Err(TryRecvError::Disconnected);
             }
             Ok(item) => {
-                if !_waker.is_waked() {
-                    _waker.cancel();
-                }
+                _waker.abandon(true);
                 self.shared.on_recv();
                 return Ok(item);
             }
@@ -248,7 +249,7 @@ impl<T> Drop for ReceiveFuture<'_, T> {
     fn drop(&mut self) {
         if let Some(waker) = self.waker.take() {
             // Cancelling the future, poll is not ready
-            if waker.abandon() {
+            if waker.abandon(false) {
                 // We are waked, but giving up to recv, should notify another receiver
                 if !self.rx.recv.is_empty() {
                     self.rx.shared.on_send();

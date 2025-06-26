@@ -5,6 +5,7 @@ use std::sync::{
 };
 use std::task::*;
 
+/// Waker object used by [crate::AsyncTx::poll_send()] and [crate::AsyncRx::poll_item()]
 pub struct LockedWaker(Arc<LockedWakerInner>);
 
 impl fmt::Debug for LockedWaker {
@@ -66,7 +67,7 @@ impl LockedWaker {
     }
 
     #[inline(always)]
-    pub fn is_waked(&self) -> bool {
+    pub(crate) fn is_waked(&self) -> bool {
         self.0.waked.load(Ordering::Acquire)
     }
 

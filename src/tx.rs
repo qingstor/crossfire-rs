@@ -166,33 +166,27 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
             item = t;
         } else {
             if let Some(old_waker) = o_waker.take() {
-                old_waker.abandon();
+                self.shared.cancel_send_waker(old_waker);
             }
             return r;
         }
         let waker = self.shared.reg_send(ctx);
         // NOTE: The other side put something whie reg_send and did not see the waker,
         // should check the channel again, otherwise might incur a dead lock.
-        match self.sender.try_send(item) {
-            Ok(()) => {
-                self.shared.on_send();
-                waker.abandon();
-                return Ok(());
-            }
-            Err(TrySendError::Full(t)) => {
-                o_waker.replace(waker);
-                if self.shared.get_rx_count() == 0 {
-                    // Check channel close before sleep, otherwise might block forever
-                    // Confirmed by test_presure_1_tx_blocking_1_rx_async()
-                    return Err(TrySendError::Disconnected(t));
-                }
-                return Err(TrySendError::Full(t));
-            }
-            Err(TrySendError::Disconnected(t)) => {
-                waker.abandon();
+        let r = self.try_send(item);
+        if let Err(TrySendError::Full(t)) = r {
+            if self.shared.get_rx_count() == 0 {
+                // Check channel close before sleep, otherwise might block forever
+                // Confirmed by test_presure_1_tx_blocking_1_rx_async()
                 return Err(TrySendError::Disconnected(t));
             }
+            o_waker.replace(waker);
+            return Err(TrySendError::Full(t));
+        } else {
+            // Ok or Disconnected
+            self.shared.cancel_send_waker(waker);
         }
+        return r;
     }
 
     /// Just for debugging purpose, to monitor queue size
@@ -215,10 +209,8 @@ impl<T: Unpin> Drop for SendFuture<'_, T> {
         if let Some(waker) = self.waker.take() {
             // Cancelling the future, poll is not ready
             if waker.abandon() {
-                // We are waked, but give up sending, should notify another sender
-                if !self.tx.sender.is_full() {
-                    self.tx.shared.on_recv();
-                }
+                // We are waked, but give up sending, should notify another sender for safty
+                self.tx.shared.on_recv();
             } else {
                 self.tx.shared.clear_send_wakers(waker.get_seq());
             }

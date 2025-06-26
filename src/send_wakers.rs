@@ -22,6 +22,8 @@ pub trait SendWakersTrait {
     fn get_size(&self) -> usize;
 
     fn clear_send_wakers(&self, _seq: u64) {}
+
+    fn cancel_send_waker(&self, _waker: LockedWaker);
 }
 
 pub struct SendWakersBlocking {}
@@ -49,8 +51,14 @@ impl SendWakersTrait for SendWakersBlocking {
     fn close(&self) {}
 
     /// return waker queue size
+    #[inline(always)]
     fn get_size(&self) -> usize {
         0
+    }
+
+    #[inline(always)]
+    fn cancel_send_waker(&self, _waker: LockedWaker) {
+        unreachable!();
     }
 }
 
@@ -81,7 +89,16 @@ impl SendWakersTrait for SendWakersSingle {
     }
 
     #[inline(always)]
-    fn clear_send_wakers(&self, _seq: u64) {}
+    fn clear_send_wakers(&self, _seq: u64) {
+        // It got to be it, because only one single thread.
+        let _ = self.sender_waker.pop();
+    }
+
+    #[inline(always)]
+    fn cancel_send_waker(&self, _waker: LockedWaker) {
+        // It got to be it, because only one single thread.
+        let _ = self.sender_waker.pop();
+    }
 
     #[inline(always)]
     fn on_recv(&self) {
@@ -125,6 +142,12 @@ impl SendWakersTrait for SendWakersMulti {
         let waker = LockedWaker::new(ctx, seq);
         let _ = self.sender_waker.push(waker.weak());
         waker
+    }
+
+    #[inline(always)]
+    fn cancel_send_waker(&self, waker: LockedWaker) {
+        // Just abandon and leave it to on_recv() to clean it
+        waker.abandon();
     }
 
     /// Call when SendFuture is cancelled.

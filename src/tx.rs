@@ -146,10 +146,13 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
     pub fn poll_send<'a>(
         &'a self, ctx: &'a mut Context, mut item: T, waker: &'a mut Option<LockedWaker>,
     ) -> Result<(), TrySendError<T>> {
+        // When the result is not TrySendError::Full,
+        // make sure always take the o_waker out and abandon,
+        // to skip the timeout cleaning logic in Drop.
         match self.sender.try_send(item) {
             Err(TrySendError::Disconnected(t)) => {
                 if let Some(old_waker) = waker.take() {
-                    old_waker.abandon();
+                    old_waker.abandon(false);
                 }
                 return Err(TrySendError::Disconnected(t));
             }
@@ -171,7 +174,7 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
             Ok(()) => {
                 self.shared.on_send();
                 if let Some(old_waker) = waker.take() {
-                    old_waker.abandon();
+                    old_waker.abandon(false);
                 }
                 return Ok(());
             }
@@ -180,9 +183,7 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
         match self.sender.try_send(item) {
             Ok(()) => {
                 self.shared.on_send();
-                if !_waker.is_waked() {
-                    _waker.cancel(); // First release out spin lock, then poll a recver_waker
-                }
+                _waker.abandon(true);
                 return Ok(());
             }
             Err(TrySendError::Full(t)) => {
@@ -196,7 +197,7 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
                 return Err(TrySendError::Full(t));
             }
             Err(TrySendError::Disconnected(t)) => {
-                _waker.cancel();
+                _waker.abandon(true);
                 return Err(TrySendError::Disconnected(t));
             }
         }
@@ -221,7 +222,7 @@ impl<T: Unpin> Drop for SendFuture<'_, T> {
     fn drop(&mut self) {
         if let Some(waker) = self.waker.take() {
             // Cancelling the future, poll is not ready
-            if waker.abandon() {
+            if waker.abandon(false) {
                 // We are waked, but give up sending, should notify another sender
                 if !self.tx.sender.is_full() {
                     self.tx.shared.on_recv();

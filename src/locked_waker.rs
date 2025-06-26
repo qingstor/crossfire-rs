@@ -66,21 +66,20 @@ impl LockedWaker {
         self.0.seq
     }
 
-    #[inline(always)]
-    pub(crate) fn cancel(&self) {
-        let _self = self.0.as_ref();
-        _self.waked.store(true, Ordering::Release);
-        _self.locked.store(false, Ordering::Release);
-    }
-
+    // past owned == true when already locked by us, before commit().
     // return is_already waked
-    pub(crate) fn abandon(&self) -> bool {
+    #[inline(always)]
+    pub(crate) fn abandon(&self, owned: bool) -> bool {
         let _self = self.0.as_ref();
-        if _self.waked.load(Ordering::Acquire) {
-            return true;
-        }
-        while _self.locked.swap(true, Ordering::SeqCst) {
-            std::hint::spin_loop();
+        if !owned {
+            if _self.waked.load(Ordering::Relaxed) {
+                // Just small optimise, this check is no change to the result.
+                return true;
+            }
+            if _self.locked.swap(true, Ordering::SeqCst) {
+                // others is trying to wake, let them be
+                return false;
+            }
         }
         let r = _self.waked.swap(true, Ordering::SeqCst);
         _self.locked.store(false, Ordering::Release);
@@ -92,25 +91,24 @@ impl LockedWaker {
         LockedWakerRef { seq: self.0.seq, w: Arc::downgrade(&self.0) }
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn is_waked(&self) -> bool {
         self.0.waked.load(Ordering::Acquire)
     }
 
     /// return true on suc wake up, false when already woken up.
-    #[inline]
+    #[inline(always)]
     pub(crate) fn wake(&self) -> bool {
         let _self = self.0.as_ref();
         while _self.locked.swap(true, Ordering::SeqCst) {
             std::hint::spin_loop();
         }
-        if _self.waked.swap(true, Ordering::SeqCst) == false {
+        let waked = _self.waked.swap(true, Ordering::SeqCst);
+        if waked == false {
             _self.waker.wake_by_ref();
-            _self.locked.store(false, Ordering::Release);
-            return true;
         }
         _self.locked.store(false, Ordering::Release);
-        return false;
+        return !waked;
     }
 }
 

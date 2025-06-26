@@ -187,7 +187,7 @@ impl<T> AsyncRx<T> {
             }
         } else {
             if let Some(old_waker) = o_waker.take() {
-                old_waker.abandon(false);
+                old_waker.abandon();
             }
             return r;
         }
@@ -196,7 +196,6 @@ impl<T> AsyncRx<T> {
         // should check the channel again, otherwise might incur a dead lock.
         match self.recv.try_recv() {
             Err(TryRecvError::Empty) => {
-                waker.commit();
                 o_waker.replace(waker);
                 if self.shared.get_tx_count() == 0 {
                     // Check channel close before sleep, otherwise might block forever
@@ -206,13 +205,12 @@ impl<T> AsyncRx<T> {
                 return Err(TryRecvError::Empty);
             }
             Err(TryRecvError::Disconnected) => {
-                waker.abandon(true);
+                waker.abandon();
                 return Err(TryRecvError::Disconnected);
             }
             Ok(item) => {
-                // NOTE: Do not use on_recv before abandon, might incur a dead lock
-                waker.abandon(true);
                 self.shared.on_recv();
+                waker.abandon();
                 return Ok(item);
             }
         }
@@ -242,7 +240,7 @@ impl<T> Drop for ReceiveFuture<'_, T> {
     fn drop(&mut self) {
         if let Some(waker) = self.waker.take() {
             // Cancelling the future, poll is not ready
-            if waker.abandon(false) {
+            if waker.abandon() {
                 // We are waked, but giving up to recv, should notify another receiver
                 if !self.rx.recv.is_empty() {
                     self.rx.shared.on_send();

@@ -10,18 +10,11 @@ pub struct LockedWaker(Arc<LockedWakerInner>);
 impl fmt::Debug for LockedWaker {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let _self = self.0.as_ref();
-        write!(
-            f,
-            "LockedWaker(seq={}, locked={}, waked={})",
-            _self.seq,
-            _self.locked.load(Ordering::Acquire),
-            _self.waked.load(Ordering::Acquire)
-        )
+        write!(f, "LockedWaker(seq={}, waked={})", _self.seq, _self.waked.load(Ordering::Acquire))
     }
 }
 
 struct LockedWakerInner {
-    locked: AtomicBool,
     waker: std::task::Waker,
     waked: AtomicBool,
     seq: u64,
@@ -49,7 +42,6 @@ impl LockedWaker {
     pub(crate) fn new(ctx: &Context, seq: u64) -> Self {
         let s = Arc::new(LockedWakerInner {
             seq,
-            locked: AtomicBool::new(true), // initial locked
             waker: ctx.waker().clone(),
             waked: AtomicBool::new(false),
         });
@@ -57,33 +49,15 @@ impl LockedWaker {
     }
 
     #[inline(always)]
-    pub(crate) fn commit(&self) {
-        self.0.locked.store(false, Ordering::Release);
-    }
-
-    #[inline(always)]
     pub(crate) fn get_seq(&self) -> u64 {
         self.0.seq
     }
 
-    // past owned == true when already locked by us, before commit().
     // return is_already waked
     #[inline(always)]
-    pub(crate) fn abandon(&self, owned: bool) -> bool {
+    pub(crate) fn abandon(&self) -> bool {
         let _self = self.0.as_ref();
-        if !owned {
-            if _self.waked.load(Ordering::Relaxed) {
-                // Just small optimise, this check is no change to the result.
-                return true;
-            }
-            if _self.locked.swap(true, Ordering::SeqCst) {
-                // others is trying to wake, let them be
-                return false;
-            }
-        }
-        let r = _self.waked.swap(true, Ordering::SeqCst);
-        _self.locked.store(false, Ordering::Release);
-        r
+        _self.waked.swap(true, Ordering::SeqCst)
     }
 
     #[inline(always)]
@@ -100,14 +74,10 @@ impl LockedWaker {
     #[inline(always)]
     pub(crate) fn wake(&self) -> bool {
         let _self = self.0.as_ref();
-        while _self.locked.swap(true, Ordering::SeqCst) {
-            std::hint::spin_loop();
-        }
         let waked = _self.waked.swap(true, Ordering::SeqCst);
         if waked == false {
             _self.waker.wake_by_ref();
         }
-        _self.locked.store(false, Ordering::Release);
         return !waked;
     }
 }

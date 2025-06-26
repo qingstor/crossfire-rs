@@ -144,51 +144,43 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
     /// for your own future impl
     #[inline(always)]
     pub fn poll_send<'a>(
-        &'a self, ctx: &'a mut Context, mut item: T, waker: &'a mut Option<LockedWaker>,
+        &'a self, ctx: &'a mut Context, mut item: T, o_waker: &'a mut Option<LockedWaker>,
     ) -> Result<(), TrySendError<T>> {
         // When the result is not TrySendError::Full,
         // make sure always take the o_waker out and abandon,
         // to skip the timeout cleaning logic in Drop.
-        match self.sender.try_send(item) {
-            Err(TrySendError::Disconnected(t)) => {
-                if let Some(old_waker) = waker.take() {
-                    old_waker.abandon(false);
-                }
+        let r = self.try_send(item);
+        if let Err(TrySendError::Full(t)) = r {
+            if self.shared.get_rx_count() == 0 {
+                // Check channel close before sleep
                 return Err(TrySendError::Disconnected(t));
             }
-            Err(TrySendError::Full(t)) => {
-                if let Some(old_waker) = waker.as_ref() {
-                    if old_waker.is_waked() {
-                        let _ = waker.take(); // reg again
-                    } else {
-                        // False wakeup
-                        if self.shared.get_rx_count() == 0 {
-                            // Check channel close before sleep
-                            return Err(TrySendError::Disconnected(t));
-                        }
-                        return Err(TrySendError::Full(t));
-                    }
+            if let Some(old_waker) = o_waker.as_ref() {
+                if old_waker.is_waked() {
+                    let _ = o_waker.take(); // reg again
+                } else {
+                    // False wakeup
+                    return Err(TrySendError::Full(t));
                 }
-                item = t;
             }
-            Ok(()) => {
-                self.shared.on_send();
-                if let Some(old_waker) = waker.take() {
-                    old_waker.abandon(false);
-                }
-                return Ok(());
+            item = t;
+        } else {
+            if let Some(old_waker) = o_waker.take() {
+                old_waker.abandon(false);
             }
+            return r;
         }
-        let _waker = self.shared.reg_send(ctx);
+        let waker = self.shared.reg_send(ctx);
         match self.sender.try_send(item) {
             Ok(()) => {
+                // NOTE: Do not use on_send before abandon, might incur a dead lock
+                waker.abandon(true);
                 self.shared.on_send();
-                _waker.abandon(true);
                 return Ok(());
             }
             Err(TrySendError::Full(t)) => {
-                _waker.commit();
-                waker.replace(_waker);
+                waker.commit();
+                o_waker.replace(waker);
                 if self.shared.get_rx_count() == 0 {
                     // Check channel close before sleep, otherwise might block forever
                     // Confirmed by test_presure_1_tx_blocking_1_rx_async()
@@ -197,7 +189,7 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
                 return Err(TrySendError::Full(t));
             }
             Err(TrySendError::Disconnected(t)) => {
-                _waker.abandon(true);
+                waker.abandon(true);
                 return Err(TrySendError::Disconnected(t));
             }
         }

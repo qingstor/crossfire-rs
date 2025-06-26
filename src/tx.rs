@@ -220,8 +220,9 @@ pub struct SendFuture<'a, T: Unpin> {
 impl<T: Unpin> Drop for SendFuture<'_, T> {
     fn drop(&mut self) {
         if let Some(waker) = self.waker.take() {
+            // Cancelling the future, poll is not ready
             if waker.abandon() {
-                // We are waked, but abandoning, should notify another sender
+                // We are waked, but give up sending, should notify another sender
                 if !self.tx.sender.is_full() {
                     self.tx.shared.on_recv();
                 }

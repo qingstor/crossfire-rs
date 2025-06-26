@@ -247,8 +247,9 @@ pub struct ReceiveFuture<'a, T> {
 impl<T> Drop for ReceiveFuture<'_, T> {
     fn drop(&mut self) {
         if let Some(waker) = self.waker.take() {
+            // Cancelling the future, poll is not ready
             if waker.abandon() {
-                // We are waked, but abandoning, should notify another receiver
+                // We are waked, but giving up to recv, should notify another receiver
                 if !self.rx.recv.is_empty() {
                     self.rx.shared.on_send();
                 }

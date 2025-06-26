@@ -21,7 +21,7 @@ pub trait SendWakersTrait {
     /// return waker queue size
     fn get_size(&self) -> usize;
 
-    fn clear_send_wakers(&self, _seq: u64, _limit: u64) {}
+    fn clear_send_wakers(&self, _seq: u64) {}
 }
 
 pub struct SendWakersBlocking {}
@@ -43,7 +43,7 @@ impl SendWakersTrait for SendWakersBlocking {
     fn on_recv(&self) {}
 
     #[inline(always)]
-    fn clear_send_wakers(&self, _seq: u64, _limit: u64) {}
+    fn clear_send_wakers(&self, _seq: u64) {}
 
     #[inline(always)]
     fn close(&self) {}
@@ -81,7 +81,7 @@ impl SendWakersTrait for SendWakersSingle {
     }
 
     #[inline(always)]
-    fn clear_send_wakers(&self, _seq: u64, _limit: u64) {}
+    fn clear_send_wakers(&self, _seq: u64) {}
 
     #[inline(always)]
     fn on_recv(&self) {
@@ -104,7 +104,6 @@ impl SendWakersTrait for SendWakersSingle {
 pub struct SendWakersMulti {
     sender_waker: SegQueue<LockedWakerRef>,
     send_waker_tx_seq: AtomicU64,
-    send_waker_rx_seq: AtomicU64,
     checking_sender: AtomicBool,
 }
 
@@ -114,7 +113,6 @@ impl SendWakersMulti {
         SendWakers::Multi(Self {
             sender_waker: SegQueue::new(),
             send_waker_tx_seq: AtomicU64::new(0),
-            send_waker_rx_seq: AtomicU64::new(0),
             checking_sender: AtomicBool::new(false),
         })
     }
@@ -129,40 +127,27 @@ impl SendWakersTrait for SendWakersMulti {
         waker
     }
 
+    /// Call when SendFuture is cancelled.
+    /// to clear the LockedWakerRef which has been sent to the other side.
     #[inline(always)]
-    fn clear_send_wakers(&self, seq: u64, limit: u64) {
-        if seq & 15 != 0 {
+    fn clear_send_wakers(&self, seq: u64) {
+        if self.checking_sender.swap(true, Ordering::SeqCst) {
+            // Other thread is cleaning
             return;
         }
-        if self.send_waker_rx_seq.load(Ordering::Acquire) + limit >= seq {
-            return;
-        }
-        if !self.checking_sender.swap(true, Ordering::SeqCst) {
-            let mut ok = true;
-            while ok {
-                if let Some(waker) = self.sender_waker.pop() {
-                    ok = self.send_waker_rx_seq.fetch_add(1, Ordering::SeqCst) + limit < seq;
-                    if let Some(real_waker) = waker.upgrade() {
-                        if !real_waker.is_canceled() {
-                            if real_waker.wake() {
-                                // we do not known push back may have concurrent problem
-                                break;
-                            }
-                        }
-                    }
-                } else {
-                    break;
-                }
+        while let Some(waker_ref) = self.sender_waker.pop() {
+            if waker_ref.try_to_clear(seq) {
+                // we do not known push back may have concurrent problem
+                break;
             }
-            self.checking_sender.store(false, Ordering::Release);
         }
+        self.checking_sender.store(false, Ordering::Release);
     }
 
     #[inline(always)]
     fn on_recv(&self) {
         loop {
             if let Some(waker) = self.sender_waker.pop() {
-                let _seq = self.send_waker_rx_seq.fetch_add(1, Ordering::SeqCst);
                 if waker.wake() {
                     return;
                 }
@@ -175,12 +160,8 @@ impl SendWakersTrait for SendWakersMulti {
     #[inline]
     fn close(&self) {
         // wake all tx, since no one will wake blocked future after that
-        loop {
-            if let Some(waker) = self.sender_waker.pop() {
-                waker.wake();
-            } else {
-                return;
-            }
+        while let Some(waker) = self.sender_waker.pop() {
+            waker.wake();
         }
     }
 

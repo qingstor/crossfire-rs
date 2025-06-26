@@ -14,7 +14,7 @@ pub enum RecvWakers {
 pub trait RecvWakersTrait {
     fn reg_recv(&self, ctx: &mut Context) -> LockedWaker;
 
-    fn clear_recv_wakers(&self, _seq: u64, _limit: u64);
+    fn clear_recv_wakers(&self, _seq: u64);
 
     fn on_send(&self);
 
@@ -40,7 +40,7 @@ impl RecvWakersTrait for RecvWakersBlocking {
     }
 
     #[inline(always)]
-    fn clear_recv_wakers(&self, _seq: u64, _limit: u64) {}
+    fn clear_recv_wakers(&self, _seq: u64) {}
 
     #[inline(always)]
     fn on_send(&self) {}
@@ -81,7 +81,7 @@ impl RecvWakersTrait for RecvWakersSingle {
     }
 
     #[inline(always)]
-    fn clear_recv_wakers(&self, _seq: u64, _limit: u64) {}
+    fn clear_recv_wakers(&self, _seq: u64) {}
 
     #[inline]
     fn on_send(&self) {
@@ -104,7 +104,6 @@ impl RecvWakersTrait for RecvWakersSingle {
 pub struct RecvWakersMulti {
     recv_waker: SegQueue<LockedWakerRef>,
     recv_waker_tx_seq: AtomicU64,
-    recv_waker_rx_seq: AtomicU64,
     checking_recv: AtomicBool,
 }
 
@@ -114,7 +113,6 @@ impl RecvWakersMulti {
         RecvWakers::Multi(Self {
             recv_waker: SegQueue::new(),
             recv_waker_tx_seq: AtomicU64::new(0),
-            recv_waker_rx_seq: AtomicU64::new(0),
             checking_recv: AtomicBool::new(false),
         })
     }
@@ -129,40 +127,27 @@ impl RecvWakersTrait for RecvWakersMulti {
         waker
     }
 
+    /// Call when ReceiveFuture is cancelled.
+    /// to clear the LockedWakerRef which has been sent to the other side.
     #[inline]
-    fn clear_recv_wakers(&self, seq: u64, limit: u64) {
-        if seq & 15 != 0 {
+    fn clear_recv_wakers(&self, seq: u64) {
+        if self.checking_recv.swap(true, Ordering::SeqCst) {
+            // Other thread is cleaning
             return;
         }
-        if self.recv_waker_rx_seq.load(Ordering::Acquire) + limit >= seq {
-            return;
-        }
-        if !self.checking_recv.swap(true, Ordering::SeqCst) {
-            let mut ok = true;
-            while ok {
-                if let Some(waker) = self.recv_waker.pop() {
-                    ok = self.recv_waker_rx_seq.fetch_add(1, Ordering::SeqCst) + limit < seq;
-                    if let Some(real_waker) = waker.upgrade() {
-                        if !real_waker.is_canceled() {
-                            if real_waker.wake() {
-                                // we do not known push back may have concurrent problem
-                                break;
-                            }
-                        }
-                    }
-                } else {
-                    break;
-                }
+        while let Some(waker_ref) = self.recv_waker.pop() {
+            if waker_ref.try_to_clear(seq) {
+                // we do not known push back may have concurrent problem
+                break;
             }
-            self.checking_recv.store(false, Ordering::Release);
         }
+        self.checking_recv.store(false, Ordering::Release);
     }
 
     #[inline]
     fn on_send(&self) {
         loop {
             if let Some(waker) = self.recv_waker.pop() {
-                let _seq = self.recv_waker_rx_seq.fetch_add(1, Ordering::SeqCst);
                 if waker.wake() {
                     return;
                 }
@@ -174,12 +159,8 @@ impl RecvWakersTrait for RecvWakersMulti {
 
     #[inline]
     fn close(&self) {
-        loop {
-            if let Some(waker) = self.recv_waker.pop() {
-                waker.wake();
-            } else {
-                return;
-            }
+        while let Some(waker) = self.recv_waker.pop() {
+            waker.wake();
         }
     }
 

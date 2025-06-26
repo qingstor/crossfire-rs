@@ -166,7 +166,7 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
             item = t;
         } else {
             if let Some(old_waker) = o_waker.take() {
-                old_waker.abandon(false);
+                old_waker.abandon();
             }
             return r;
         }
@@ -175,13 +175,11 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
         // should check the channel again, otherwise might incur a dead lock.
         match self.sender.try_send(item) {
             Ok(()) => {
-                // NOTE: Do not use on_send before abandon, might incur a dead lock
-                waker.abandon(true);
                 self.shared.on_send();
+                waker.abandon();
                 return Ok(());
             }
             Err(TrySendError::Full(t)) => {
-                waker.commit();
                 o_waker.replace(waker);
                 if self.shared.get_rx_count() == 0 {
                     // Check channel close before sleep, otherwise might block forever
@@ -191,7 +189,7 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
                 return Err(TrySendError::Full(t));
             }
             Err(TrySendError::Disconnected(t)) => {
-                waker.abandon(true);
+                waker.abandon();
                 return Err(TrySendError::Disconnected(t));
             }
         }
@@ -216,7 +214,7 @@ impl<T: Unpin> Drop for SendFuture<'_, T> {
     fn drop(&mut self) {
         if let Some(waker) = self.waker.take() {
             // Cancelling the future, poll is not ready
-            if waker.abandon(false) {
+            if waker.abandon() {
                 // We are waked, but give up sending, should notify another sender
                 if !self.tx.sender.is_full() {
                     self.tx.shared.on_recv();

@@ -60,7 +60,7 @@
 //! <table align="center" cellpadding="20">
 //! <tr> <th rowspan="2"> Context</th><th colspan="2" align="center">Sender (Producer)</th> <th colspan="2" align="center">Receiver (Consumer)</th> </tr>
 //! <tr> <td>Single</td> <td>Multiple</td><td>Single</td><td>Multiple</td></tr>
-//! <tr><td rowspan="2"><b>Blocking</b></td><td colspan="2" align="center"><a href="trait.BlockingTxTrait.html">BlockingRxTrait</a></td>
+//! <tr><td rowspan="2"><b>Blocking</b></td><td colspan="2" align="center"><a href="trait.BlockingTxTrait.html">BlockingTxTrait</a></td>
 //! <td colspan="2" align="center"><a href="trait.BlockingRxTrait.html">BlockingRxTrait</a></td></tr>
 //! <tr>
 //! <td align="center"><a href="struct.Tx.html">Tx</a></td>

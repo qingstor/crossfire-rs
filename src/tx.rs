@@ -1,6 +1,7 @@
 use crate::channel::*;
 use async_trait::async_trait;
-pub use crossbeam::channel::{SendError, Sender, TrySendError};
+use crossbeam::channel::Sender;
+pub use crossbeam::channel::{SendError, TrySendError};
 use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
@@ -33,9 +34,9 @@ impl<T> Tx<T> {
 
     /// Send message. Will block when channel is full.
     ///
-    /// Returns Ok(()) on successful.
+    /// Returns `Ok(())` on successful.
     ///
-    /// Returns SendError(item) when all Rx is dropped.
+    /// Returns Err([SendError]) when all Rx is dropped.
     ///
     #[inline]
     pub fn send(&self, item: T) -> Result<(), SendError<T>> {
@@ -50,11 +51,11 @@ impl<T> Tx<T> {
 
     /// Try to send message, non-blocking
     ///
-    /// Returns Ok() when successful.
+    /// Returns `Ok(())` when successful.
     ///
-    /// Returns [TrySendError::Full] on channel full for bounded channel.
+    /// Returns Err([TrySendError::Full]) on channel full for bounded channel.
     ///
-    /// Returns [TrySendError::Disconnected] when all Rx dropped.
+    /// Returns Err([TrySendError::Disconnected]) when all Rx dropped.
     #[inline]
     pub fn try_send(&self, item: T) -> Result<(), TrySendError<T>> {
         match self.sender.try_send(item) {
@@ -81,7 +82,8 @@ impl<T> Tx<T> {
 
 /// Sender that works in async context
 ///
-/// **NOTE**: this is not clonable. If you need concurrent access, use [crate::MAsyncTx] instead.
+/// **NOTE: this is not clonable.**
+/// If you need concurrent access, use [MAsyncTx](crate::MAsyncTx) instead.
 pub struct AsyncTx<T> {
     pub(crate) sender: Sender<T>,
     pub(crate) shared: Arc<ChannelShared>,
@@ -99,58 +101,15 @@ impl<T> Drop for AsyncTx<T> {
     }
 }
 
-impl<T> AsyncTx<T> {
-    #[inline]
-    pub(crate) fn new(sender: Sender<T>, shared: Arc<ChannelShared>) -> Self {
-        Self { sender, shared }
-    }
-
-    /// Send a message while blocking the current thread. (Used outside async context,
-    /// if you know what you're doing)
-    #[inline]
-    pub fn send_blocking(&self, item: T) -> Result<(), SendError<T>> {
-        self.sender.send(item)
-    }
-
-    /// Try to send message, non-blocking
-    ///
-    /// Returns Ok() when successful.
-    ///
-    /// Returns [TrySendError::Full] on channel full for bounded channel.
-    ///
-    /// Returns [TrySendError::Disconnected] when all Rx dropped.
-    #[inline]
-    pub fn try_send(&self, item: T) -> Result<(), TrySendError<T>> {
-        match self.sender.try_send(item) {
-            Err(e) => return Err(e),
-            Ok(_) => {
-                self.shared.on_send();
-                return Ok(());
-            }
-        }
-    }
-
-    /// Probe possible messages in the channel (not accurate)
-    #[inline]
-    pub fn len(&self) -> usize {
-        self.sender.len()
-    }
-
-    /// Whether there's message in the channel (not accurate)
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.sender.is_empty()
-    }
-}
-
 impl<T: Unpin + Send + 'static> AsyncTx<T> {
     /// Send message. Will await when channel is full.
     ///
-    /// Returns Ok(()) on successful.
+    /// Returns `Ok(())` on successful.
     ///
-    /// Returns SendError(item) when all Rx is dropped.
+    /// Returns Err([SendError]) when all Rx is dropped.
     ///
-    /// **NOTE**: Do not call concurrently. If you need concurrent access, use [crate::MAsyncTx::send()] instead.
+    /// **NOTE: Do not call concurrently.**
+    /// If you need concurrent access, use [MAsyncTx](crate::MAsyncTx) instead.
     #[inline(always)]
     pub async fn send(&self, item: T) -> Result<(), SendError<T>> {
         match self.try_send(item) {
@@ -170,7 +129,7 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
 
     /// This is only useful when you're writing your own future.
     ///
-    /// Returns Ok(()) on message sent.
+    /// Returns `Ok(())` on message sent.
     ///
     /// Returns Err([TrySendError::Full]) for Poll::Pending case.
     ///
@@ -230,6 +189,61 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
     }
 }
 
+impl<T> AsyncTx<T> {
+    #[inline]
+    pub(crate) fn new(sender: Sender<T>, shared: Arc<ChannelShared>) -> Self {
+        Self { sender, shared }
+    }
+
+    /// Try to send message, non-blocking
+    ///
+    /// Returns `Ok(())` when successful.
+    ///
+    /// Returns Err([TrySendError::Full]) on channel full for bounded channel.
+    ///
+    /// Returns Err([TrySendError::Disconnected]) when all Rx dropped.
+    #[inline]
+    pub fn try_send(&self, item: T) -> Result<(), TrySendError<T>> {
+        match self.sender.try_send(item) {
+            Err(e) => return Err(e),
+            Ok(_) => {
+                self.shared.on_send();
+                return Ok(());
+            }
+        }
+    }
+
+    /// Probe possible messages in the channel (not accurate)
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.sender.len()
+    }
+
+    /// Whether there's message in the channel (not accurate)
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.sender.is_empty()
+    }
+
+    /// Send a message while **blocking the current thread**. Be careful!
+    ///
+    /// Returns `Ok(())`on successful.
+    ///
+    /// Returns Err([SendError]) when all Rx is dropped.
+    ///
+    /// **NOTE: Do not use it in async context otherwise will block the runtime.**
+    #[inline]
+    pub fn send_blocking(&self, item: T) -> Result<(), SendError<T>> {
+        match self.sender.send(item) {
+            Ok(()) => {
+                self.shared.on_send();
+                return Ok(());
+            }
+            Err(e) => return Err(e),
+        }
+    }
+}
+
 /// A fixed-sized future object construted by [AsyncTx::make_send_future()]
 pub struct SendFuture<'a, T: Unpin> {
     tx: &'a AsyncTx<T>,
@@ -278,18 +292,18 @@ impl<T: Unpin + Send + 'static> Future for SendFuture<'_, T> {
 pub trait BlockingTxTrait<T: Send + 'static>: Send + 'static {
     /// Send message. Will block when channel is full.
     ///
-    /// Returns Ok(()) on successful.
+    /// Returns `Ok(())` on successful.
     ///
-    /// Returns SendError(item) when all Rx is dropped.
+    /// Returns Err([SendError]) when all Rx is dropped.
     fn send(&self, _item: T) -> Result<(), SendError<T>>;
 
     /// Try to send message, non-blocking
     ///
-    /// Returns Ok() when successful.
+    /// Returns `Ok(())` when successful.
     ///
-    /// Returns [TrySendError::Full] on channel full for bounded channel.
+    /// Returns Err([TrySendError::Full]) on channel full for bounded channel.
     ///
-    /// Returns [TrySendError::Disconnected] when all Rx dropped.
+    /// Returns Err([TrySendError::Disconnected]) when all Rx dropped.
     fn try_send(&self, _item: T) -> Result<(), TrySendError<T>>;
 
     /// Probe possible messages in the channel (not accurate)
@@ -326,9 +340,9 @@ impl<T: Send + 'static> BlockingTxTrait<T> for Tx<T> {
 pub trait AsyncTxTrait<T: Unpin + Send + 'static>: Send + Sync + 'static {
     /// Send message. Will await when channel is full.
     ///
-    /// Returns Ok(()) on successful.
+    /// Returns `Ok(())` on successful.
     ///
-    /// Returns SendError(item) when all Rx is dropped.
+    /// Returns Err([SendError]) when all Rx is dropped.
     async fn send(&self, item: T) -> Result<(), SendError<T>>;
 
     /// Just for debugging purpose, to monitor queue size
@@ -337,7 +351,7 @@ pub trait AsyncTxTrait<T: Unpin + Send + 'static>: Send + Sync + 'static {
 
     /// Try to send message, non-blocking
     ///
-    /// Returns Ok() when successful.
+    /// Returns `Ok(())` when successful.
     ///
     /// Returns [TrySendError::Full] on channel full for bounded channel.
     ///

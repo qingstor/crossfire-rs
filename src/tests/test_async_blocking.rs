@@ -133,12 +133,12 @@ fn test_presure_1_tx_async_1_rx_blocking<T: AsyncTxTrait<usize>, R: BlockingRxTr
             match rx.recv() {
                 Ok(_) => {
                     _counter.as_ref().fetch_add(1, Ordering::SeqCst);
-                    //print!("{} {}\r", _rx_i, i);
+                    //debug!("{} {}\r", _rx_i, i);
                 }
                 Err(_) => break 'A,
             }
         }
-        println!("rx exit");
+        debug!("rx exit");
     });
     let rt = get_runtime();
     rt.block_on(async move {
@@ -148,7 +148,7 @@ fn test_presure_1_tx_async_1_rx_blocking<T: AsyncTxTrait<usize>, R: BlockingRxTr
                 _ => {}
             }
         }
-        println!("tx exit");
+        debug!("tx exit");
     });
     let _ = th.join();
     assert_eq!(counter.as_ref().load(Ordering::Acquire), round);
@@ -178,12 +178,12 @@ fn test_presure_multi_tx_async_1_rx_blocking<R: BlockingRxTrait<usize>>(
             match rx.recv() {
                 Ok(_) => {
                     _counter.as_ref().fetch_add(1, Ordering::SeqCst);
-                    //print!("{} {}\r", _rx_i, i);
+                    //debug!("{} {}\r", _rx_i, i);
                 }
                 Err(_) => break 'A,
             }
         }
-        println!("rx exit");
+        debug!("rx exit");
     });
     let rt = get_runtime();
     rt.block_on(async move {
@@ -199,7 +199,7 @@ fn test_presure_multi_tx_async_1_rx_blocking<R: BlockingRxTrait<usize>>(
                     }
                 }
                 let _ = _noti_tx.send(_tx_i).await;
-                println!("tx {} exit", _tx_i);
+                debug!("tx {} exit", _tx_i);
             });
         }
         drop(tx);
@@ -239,12 +239,12 @@ fn test_presure_multi_tx_async_multi_rx_blocking(
                 match _rx.recv() {
                     Ok(_) => {
                         _counter.as_ref().fetch_add(1, Ordering::SeqCst);
-                        //print!("{} {}\r", _rx_i, i);
+                        //debug!("{} {}\r", _rx_i, i);
                     }
                     Err(_) => break 'A,
                 }
             }
-            println!("rx {} exit", _rx_i);
+            debug!("rx {} exit", _rx_i);
         }));
     }
     drop(rx);
@@ -262,7 +262,7 @@ fn test_presure_multi_tx_async_multi_rx_blocking(
                     }
                 }
                 let _ = _noti_tx.send(_tx_i).await;
-                println!("tx {} exit", _tx_i);
+                debug!("tx {} exit", _tx_i);
             });
         }
         drop(tx);

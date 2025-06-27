@@ -82,7 +82,7 @@ async fn test_basic_bounded_1_thread<T: AsyncTxTrait<i32>, R: AsyncRxTrait<i32>>
         for i in 0i32..12 {
             match rx.recv().await {
                 Ok(j) => {
-                    println!("recv {}", i);
+                    debug!("recv {}", i);
                     assert_eq!(i, j);
                 }
                 Err(e) => {
@@ -92,7 +92,7 @@ async fn test_basic_bounded_1_thread<T: AsyncTxTrait<i32>, R: AsyncRxTrait<i32>>
         }
         let res = rx.recv().await;
         assert!(res.is_err());
-        println!("rx close");
+        debug!("rx close");
         let _ = noti_tx.send(true);
     });
     assert!(tx.send(10).await.is_ok());
@@ -125,7 +125,7 @@ async fn test_basic_unbounded_1_thread<T: BlockingTxTrait<i32>, R: AsyncRxTrait<
         for i in 0i32..12 {
             match rx.recv().await {
                 Ok(j) => {
-                    println!("recv {}", i);
+                    debug!("recv {}", i);
                     assert_eq!(i, j);
                 }
                 Err(e) => {
@@ -135,7 +135,7 @@ async fn test_basic_unbounded_1_thread<T: BlockingTxTrait<i32>, R: AsyncRxTrait<
         }
         let res = rx.recv().await;
         assert!(res.is_err());
-        println!("rx close");
+        debug!("rx close");
         let _ = noti_tx.send(true);
     });
     assert!(tx.send(10).is_ok());
@@ -433,7 +433,7 @@ async fn test_presure_bounded_async_multi(
                 }
             }
             let _ = _noti_tx.send(_rx_i).await;
-            //println!("rx {} exit", _rx_i);
+            //debug!("rx {} exit", _rx_i);
         });
     }
     drop(tx);

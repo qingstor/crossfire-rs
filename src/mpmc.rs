@@ -4,7 +4,8 @@ use crate::m_rx::*;
 use crate::m_tx::*;
 
 /// Initiate a unbounded channel.
-/// Sender will never block, so we use the same TxBlocking for threads
+///
+/// Altough sender type is MTx, will never block.
 pub fn unbounded_async<T: Unpin>() -> (MTx<T>, MAsyncRx<T>) {
     let (tx, rx) = crossbeam::channel::unbounded();
 
@@ -16,8 +17,13 @@ pub fn unbounded_async<T: Unpin>() -> (MTx<T>, MAsyncRx<T>) {
     (tx, rx)
 }
 
-/// Initiate a bounded channel that sender and receiver are async
-pub fn bounded_async<T: Unpin>(size: usize) -> (MAsyncTx<T>, MAsyncRx<T>) {
+/// Initiate a bounded channel that sender and receiver are async.
+///
+/// Special case: 0 size is not supported yet, threat it as 1 size for now.
+pub fn bounded_async<T: Unpin>(mut size: usize) -> (MAsyncTx<T>, MAsyncRx<T>) {
+    if size == 0 {
+        size = 1;
+    }
     let (tx, rx) = crossbeam::channel::bounded(size);
     let send_wakers = SendWakersMulti::new();
     let recv_wakers = RecvWakersMulti::new();
@@ -27,8 +33,13 @@ pub fn bounded_async<T: Unpin>(size: usize) -> (MAsyncTx<T>, MAsyncRx<T>) {
     (tx, rx)
 }
 
-/// Initiate a bounded channel that sender is async, receiver is blocking
-pub fn bounded_tx_async_rx_blocking<T: Unpin>(size: usize) -> (MAsyncTx<T>, MRx<T>) {
+/// Initiate a bounded channel that sender is async, receiver is blocking.
+///
+/// Special case: 0 size is not supported yet, threat it as 1 size for now.
+pub fn bounded_tx_async_rx_blocking<T: Unpin>(mut size: usize) -> (MAsyncTx<T>, MRx<T>) {
+    if size == 0 {
+        size = 1;
+    }
     let (tx, rx) = crossbeam::channel::bounded(size);
     let send_wakers = SendWakersMulti::new();
     let recv_wakers = RecvWakersBlocking::new();
@@ -39,8 +50,13 @@ pub fn bounded_tx_async_rx_blocking<T: Unpin>(size: usize) -> (MAsyncTx<T>, MRx<
     (tx, rx)
 }
 
-/// Initiate a bounded channel that sender is blocking, receiver is sync
-pub fn bounded_tx_blocking_rx_async<T: Unpin>(size: usize) -> (MTx<T>, MAsyncRx<T>) {
+/// Initiate a bounded channel that sender is blocking, receiver is async
+///
+/// Special case: 0 size is not supported yet, threat it as 1 size for now.
+pub fn bounded_tx_blocking_rx_async<T: Unpin>(mut size: usize) -> (MTx<T>, MAsyncRx<T>) {
+    if size == 0 {
+        size = 1;
+    }
     let (tx, rx) = crossbeam::channel::bounded(size);
     let send_wakers = SendWakersBlocking::new();
     let recv_wakers = RecvWakersMulti::new();

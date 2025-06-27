@@ -17,14 +17,14 @@ It supports async context, or communicates between async-blocking context.
 
 Implemented with lockless in mind, low level is based on crossbeam-channel.
 
-## Stablity and versions
+## Stability and versions
 
 Crossfire v1.0 has been released and used in production since 2022.12. Heavily tested on X86_64 and ARM.
 
-v2.0 has refactored the codebase and API at 2025.6. By removing generic types of ChanelShare object in sender and receiver,
+V2.0 has refactored the codebase and API at 2025.6. By removing generic types of ChannelShared object in sender and receiver,
 it's easier to remember and code.
 
-v2.0.x branch will remain in maintenance mode. Further optimization might be in v2.x_beta
+V2.0.x branch will remain in maintenance mode. Further optimization might be in v2.x_beta
 version until long run tests prove to be stable.
 
 ## Performance
@@ -95,7 +95,7 @@ The return types in these 3 modules are different:
 </table>
 
 
-> **NOTE**: For SP / SC version [AsyncTx] and [AsyncRx], although not designed to be non-clonable,
+> **NOTE**: For SP / SC version [AsyncTx] and [AsyncRx], although not designed to be not cloneable,
  send() recv() use immutable &self for convenient reason. Be careful do not use the SP/SC concurrently when put in Arc.
 
 ### Error types
@@ -113,7 +113,7 @@ While using MAsyncTx or MAsyncRx, there's memory overhead to pass along small si
 for pending async producer or consumer. Because we aim to be lockless,
 when the sending/receiving futures are cancelled (like tokio::time::timeout()),
 might trigger immediate cleanup if non-conflict conditions are met.
-Otherwise will rely on lazy cleanup. (waker will be consumed by actural message send and recv).
+Otherwise will rely on lazy cleanup. (waker will be consumed by actual message send and recv).
 
 Never the less, for close notification without sending anything,
 I suggest that use `tokio::sync::oneshot` instead.

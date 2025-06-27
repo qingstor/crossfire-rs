@@ -27,9 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Refactor the API design. Unify sender and receiver types.
 
-- Removal of macro rules and refactor ChannelShared into Enum, thus removal of generic type in channel shared struture.
+- Removal of macro rules and refactor SendWakers & RecvWakers into Enum, thus removal of generic type in Channelshared structure.
 
-- Removal of the spin lock in LockedWaker. Simplifing the logic without lossing performance.
+- Removal of the spin lock in LockedWaker. Simplifying the logic without losing performance.
 
 - Rewrite the test cases with rstest.
 

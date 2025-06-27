@@ -82,7 +82,7 @@ impl<T> Tx<T> {
 
 /// Sender that works in async context
 ///
-/// **NOTE: this is not clonable.**
+/// **NOTE: this is not cloneable.**
 /// If you need concurrent access, use [MAsyncTx](crate::MAsyncTx) instead.
 pub struct AsyncTx<T> {
     pub(crate) sender: Sender<T>,
@@ -169,7 +169,7 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
         if let Err(TrySendError::Full(t)) = r {
             if self.shared.get_rx_count() == 0 {
                 // Check channel close before sleep, otherwise might block forever
-                // Confirmed by test_presure_1_tx_blocking_1_rx_async()
+                // Confirmed by test_pressure_1_tx_blocking_1_rx_async()
                 return Err(TrySendError::Disconnected(t));
             }
             o_waker.replace(waker);
@@ -244,7 +244,7 @@ impl<T> AsyncTx<T> {
     }
 }
 
-/// A fixed-sized future object construted by [AsyncTx::make_send_future()]
+/// A fixed-sized future object constructed by [AsyncTx::make_send_future()]
 pub struct SendFuture<'a, T: Unpin> {
     tx: &'a AsyncTx<T>,
     item: Option<T>,
@@ -256,7 +256,7 @@ impl<T: Unpin> Drop for SendFuture<'_, T> {
         if let Some(waker) = self.waker.take() {
             // Cancelling the future, poll is not ready
             if waker.abandon() {
-                // We are waked, but give up sending, should notify another sender for safty
+                // We are waked, but give up sending, should notify another sender for safety
                 self.tx.shared.on_recv();
             } else {
                 self.tx.shared.clear_send_wakers(waker.get_seq());

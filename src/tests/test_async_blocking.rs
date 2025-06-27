@@ -118,7 +118,7 @@ fn test_basic_multi_tx_async_1_rx_blocking<R: BlockingRxTrait<usize>>(
 #[case(mpmc::bounded_tx_async_rx_blocking::<usize>(10))]
 #[case(mpmc::bounded_tx_async_rx_blocking::<usize>(100))]
 #[case(mpmc::bounded_tx_async_rx_blocking::<usize>(1000))]
-fn test_presure_1_tx_async_1_rx_blocking<T: AsyncTxTrait<usize>, R: BlockingRxTrait<usize>>(
+fn test_pressure_1_tx_async_1_rx_blocking<T: AsyncTxTrait<usize>, R: BlockingRxTrait<usize>>(
     setup_log: (), #[case] channel: (T, R),
 ) {
     let _ = setup_log; // Disable unused var warning
@@ -163,7 +163,7 @@ fn test_presure_1_tx_async_1_rx_blocking<T: AsyncTxTrait<usize>, R: BlockingRxTr
 #[case(mpmc::bounded_tx_async_rx_blocking::<usize>(10), 100)]
 #[case(mpmc::bounded_tx_async_rx_blocking::<usize>(10), 10)]
 #[case(mpmc::bounded_tx_async_rx_blocking::<usize>(100), 200)]
-fn test_presure_multi_tx_async_1_rx_blocking<R: BlockingRxTrait<usize>>(
+fn test_pressure_multi_tx_async_1_rx_blocking<R: BlockingRxTrait<usize>>(
     setup_log: (), #[case] channel: (MAsyncTx<usize>, R), #[case] tx_count: usize,
 ) {
     let _ = setup_log; // Disable unused var warning
@@ -220,7 +220,7 @@ fn test_presure_multi_tx_async_1_rx_blocking<R: BlockingRxTrait<usize>>(
 #[case(mpmc::bounded_tx_async_rx_blocking::<usize>(10), 100, 100)]
 #[case(mpmc::bounded_tx_async_rx_blocking::<usize>(10), 10, 1000)]
 #[case(mpmc::bounded_tx_async_rx_blocking::<usize>(100), 500, 500)]
-fn test_presure_multi_tx_async_multi_rx_blocking(
+fn test_pressure_multi_tx_async_multi_rx_blocking(
     setup_log: (), #[case] channel: (MAsyncTx<usize>, MRx<usize>), #[case] tx_count: usize,
     #[case] rx_count: usize,
 ) {
@@ -229,12 +229,12 @@ fn test_presure_multi_tx_async_multi_rx_blocking(
 
     let counter = Arc::new(AtomicUsize::new(0));
     let round: usize = 100000;
-    let mut rx_ths = Vec::new();
+    let mut rx_th_s = Vec::new();
     for _rx_i in 0..rx_count {
         let _rx = rx.clone();
         let _round = round;
         let _counter = counter.clone();
-        rx_ths.push(thread::spawn(move || {
+        rx_th_s.push(thread::spawn(move || {
             'A: loop {
                 match _rx.recv() {
                     Ok(_) => {
@@ -274,7 +274,7 @@ fn test_presure_multi_tx_async_multi_rx_blocking(
             }
         }
     });
-    for th in rx_ths {
+    for th in rx_th_s {
         let _ = th.join();
     }
     assert_eq!(counter.as_ref().load(Ordering::Acquire), round * (tx_count));

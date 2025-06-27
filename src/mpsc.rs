@@ -5,7 +5,7 @@ use crate::rx::*;
 
 /// Initiate a unbounded channel.
 ///
-/// Altough sender type is MTx, will never block.
+/// Although sender type is MTx, will never block.
 pub fn unbounded_async<T: Unpin>() -> (MTx<T>, AsyncRx<T>) {
     let (tx, rx) = crossbeam::channel::unbounded();
     let send_wakers = SendWakersBlocking::new();

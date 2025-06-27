@@ -83,7 +83,7 @@ impl<T> Rx<T> {
 
 /// Receiver that works in async context
 ///
-/// **NOTE: this is not clonable.**
+/// **NOTE: this is not cloneable.**
 /// If you need concurrent access, use [MAsyncRx](crate::MAsyncRx) instead.
 pub struct AsyncRx<T> {
     pub(crate) recv: Receiver<T>,
@@ -214,7 +214,7 @@ impl<T> AsyncRx<T> {
         if let Err(TryRecvError::Empty) = &r {
             if self.shared.get_tx_count() == 0 {
                 // Check channel close before sleep, otherwise might block forever
-                // Confirmed by test_presure_1_tx_blocking_1_rx_async()
+                // Confirmed by test_pressure_1_tx_blocking_1_rx_async()
                 return Err(TryRecvError::Disconnected);
             }
             o_waker.replace(waker);
@@ -257,7 +257,7 @@ impl<T> AsyncRx<T> {
     }
 }
 
-/// A fixed-sized future object contructed by [AsyncRx::make_recv_future()]
+/// A fixed-sized future object constructed by [AsyncRx::make_recv_future()]
 pub struct ReceiveFuture<'a, T> {
     rx: &'a AsyncRx<T>,
     waker: Option<LockedWaker>,
@@ -268,7 +268,7 @@ impl<T> Drop for ReceiveFuture<'_, T> {
         if let Some(waker) = self.waker.take() {
             // Cancelling the future, poll is not ready
             if waker.abandon() {
-                // We are waked, but giving up to recv, should notify another receiver for safty
+                // We are waked, but giving up to recv, should notify another receiver for safety
                 self.rx.shared.on_send();
             } else {
                 self.rx.shared.clear_recv_wakers(waker.get_seq());

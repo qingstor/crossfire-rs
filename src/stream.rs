@@ -4,7 +4,7 @@ use futures::stream;
 use std::pin::Pin;
 use std::task::*;
 
-/// Contructed by [AsyncRx::into_stream()](crate::AsyncRx::into_stream())
+/// Constructed by [AsyncRx::into_stream()](crate::AsyncRx::into_stream())
 ///
 /// Implemented futures::stream::Stream;
 pub struct AsyncStream<T>

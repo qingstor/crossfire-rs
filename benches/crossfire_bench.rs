@@ -26,11 +26,11 @@ fn _crossbeam_bounded_sync(bound: usize, tx_count: usize, rx_count: usize, msg_c
     let (tx, rx) = crossbeam::channel::bounded::<usize>(bound);
     let send_counter = Arc::new(AtomicUsize::new(0));
     let recv_counter = Arc::new(AtomicUsize::new(0));
-    let mut ths = Vec::new();
+    let mut th_s = Vec::new();
     for _ in 0..tx_count {
         let _send_counter = send_counter.clone();
         let _tx = tx.clone();
-        ths.push(thread::spawn(move || {
+        th_s.push(thread::spawn(move || {
             loop {
                 let i = _send_counter.fetch_add(1, Ordering::SeqCst);
                 if i < msg_count {
@@ -45,7 +45,7 @@ fn _crossbeam_bounded_sync(bound: usize, tx_count: usize, rx_count: usize, msg_c
     for _ in 0..(rx_count - 1) {
         let _rx = rx.clone();
         let _recv_counter = recv_counter.clone();
-        ths.push(thread::spawn(move || {
+        th_s.push(thread::spawn(move || {
             loop {
                 match _rx.recv() {
                     Ok(_) => {
@@ -68,7 +68,7 @@ fn _crossbeam_bounded_sync(bound: usize, tx_count: usize, rx_count: usize, msg_c
             }
         }
     }
-    for th in ths {
+    for th in th_s {
         let _ = th.join();
     }
     assert!(send_counter.load(Ordering::Acquire) >= msg_count);
@@ -106,11 +106,11 @@ async fn _tokio_bounded_mpsc(bound: usize, tx_count: usize, msg_count: usize) {
 fn _flume_bounded_sync(bound: usize, tx_count: usize, rx_count: usize, msg_count: usize) {
     let (tx, rx) = flume::bounded(bound);
     let send_counter = Arc::new(AtomicUsize::new(0));
-    let mut ths = Vec::new();
+    let mut th_s = Vec::new();
     for _tx_i in 0..tx_count {
         let _send_counter = send_counter.clone();
         let _tx = tx.clone();
-        ths.push(thread::spawn(move || {
+        th_s.push(thread::spawn(move || {
             loop {
                 let i = _send_counter.fetch_add(1, Ordering::SeqCst);
                 if i < msg_count {
@@ -128,7 +128,7 @@ fn _flume_bounded_sync(bound: usize, tx_count: usize, rx_count: usize, msg_count
     for _ in 0..(rx_count - 1) {
         let _rx = rx.clone();
         let _rx_counter = recv_counter.clone();
-        ths.push(thread::spawn(move || {
+        th_s.push(thread::spawn(move || {
             loop {
                 match _rx.recv() {
                     Ok(_) => {
@@ -151,7 +151,7 @@ fn _flume_bounded_sync(bound: usize, tx_count: usize, rx_count: usize, msg_count
             }
         }
     }
-    for th in ths {
+    for th in th_s {
         let _ = th.join();
     }
     assert!(send_counter.load(Ordering::Acquire) >= msg_count);
@@ -161,11 +161,11 @@ fn _flume_bounded_sync(bound: usize, tx_count: usize, rx_count: usize, msg_count
 async fn _flume_unbounded_async(bound: usize, tx_count: usize, rx_count: usize, msg_count: usize) {
     let (tx, rx) = flume::bounded(bound);
     let counter = Arc::new(AtomicUsize::new(0));
-    let mut ths = Vec::new();
+    let mut th_s = Vec::new();
     for _tx_i in 0..tx_count {
         let _counter = counter.clone();
         let _tx = tx.clone();
-        ths.push(tokio::spawn(async move {
+        th_s.push(tokio::spawn(async move {
             loop {
                 let i = _counter.fetch_add(1, Ordering::SeqCst);
                 if i < msg_count {
@@ -183,7 +183,7 @@ async fn _flume_unbounded_async(bound: usize, tx_count: usize, rx_count: usize, 
     for _ in 0..(rx_count - 1) {
         let _rx = rx.clone();
         let _recv_counter = recv_counter.clone();
-        ths.push(tokio::spawn(async move {
+        th_s.push(tokio::spawn(async move {
             loop {
                 match _rx.recv_async().await {
                     Ok(_) => {
@@ -206,7 +206,7 @@ async fn _flume_unbounded_async(bound: usize, tx_count: usize, rx_count: usize, 
             }
         }
     }
-    for th in ths {
+    for th in th_s {
         let _ = th.await;
     }
     assert!(counter.load(Ordering::Acquire) >= msg_count);
@@ -216,11 +216,11 @@ async fn _flume_unbounded_async(bound: usize, tx_count: usize, rx_count: usize, 
 async fn _flume_bounded_async(bound: usize, tx_count: usize, rx_count: usize, msg_count: usize) {
     let (tx, rx) = flume::bounded(bound);
     let counter = Arc::new(AtomicUsize::new(0));
-    let mut ths = Vec::new();
+    let mut th_s = Vec::new();
     for _tx_i in 0..tx_count {
         let _counter = counter.clone();
         let _tx = tx.clone();
-        ths.push(tokio::spawn(async move {
+        th_s.push(tokio::spawn(async move {
             loop {
                 let i = _counter.fetch_add(1, Ordering::SeqCst);
                 if i < msg_count {
@@ -238,7 +238,7 @@ async fn _flume_bounded_async(bound: usize, tx_count: usize, rx_count: usize, ms
     for _ in 0..(rx_count - 1) {
         let _rx = rx.clone();
         let _recv_counter = recv_counter.clone();
-        ths.push(tokio::spawn(async move {
+        th_s.push(tokio::spawn(async move {
             loop {
                 match _rx.recv_async().await {
                     Ok(_) => {
@@ -261,7 +261,7 @@ async fn _flume_bounded_async(bound: usize, tx_count: usize, rx_count: usize, ms
             }
         }
     }
-    for th in ths {
+    for th in th_s {
         let _ = th.await;
     }
     assert!(counter.load(Ordering::Acquire) >= msg_count);
@@ -296,10 +296,10 @@ async fn _crossfire_blocking_async<T: BlockingTxTrait<usize>, R: AsyncRxTrait<us
     txs: Vec<T>, mut rxs: Vec<R>, msg_count: usize,
 ) {
     let counter = Arc::new(AtomicUsize::new(0));
-    let mut sender_ths = Vec::new();
+    let mut sender_th_s = Vec::new();
     for tx in txs {
         let _counter = counter.clone();
-        sender_ths.push(thread::spawn(move || {
+        sender_th_s.push(thread::spawn(move || {
             loop {
                 let i = _counter.fetch_add(1, Ordering::SeqCst);
                 if i < msg_count {
@@ -314,11 +314,11 @@ async fn _crossfire_blocking_async<T: BlockingTxTrait<usize>, R: AsyncRxTrait<us
     }
     let recv_counter = Arc::new(AtomicUsize::new(0));
     let rx_count = rxs.len();
-    let mut recv_ths = Vec::new();
+    let mut recv_th_s = Vec::new();
     for _ in 0..(rx_count - 1) {
         let _rx = rxs.pop().unwrap();
         let _recv_counter = recv_counter.clone();
-        recv_ths.push(tokio::spawn(async move {
+        recv_th_s.push(tokio::spawn(async move {
             loop {
                 match _rx.recv().await {
                     Ok(_) => {
@@ -342,10 +342,10 @@ async fn _crossfire_blocking_async<T: BlockingTxTrait<usize>, R: AsyncRxTrait<us
             }
         }
     }
-    for th in recv_ths {
+    for th in recv_th_s {
         let _ = th.await;
     }
-    for th in sender_ths {
+    for th in sender_th_s {
         let _ = th.join();
     }
     assert!(counter.load(Ordering::Acquire) >= msg_count);
@@ -356,10 +356,10 @@ async fn _crossfire_bounded_async<T: AsyncTxTrait<usize>, R: AsyncRxTrait<usize>
     txs: Vec<T>, mut rxs: Vec<R>, msg_count: usize,
 ) {
     let counter = Arc::new(AtomicUsize::new(0));
-    let mut ths = Vec::new();
+    let mut th_s = Vec::new();
     for tx in txs {
         let _counter = counter.clone();
-        ths.push(tokio::spawn(async move {
+        th_s.push(tokio::spawn(async move {
             loop {
                 let i = _counter.fetch_add(1, Ordering::SeqCst);
                 if i < msg_count {
@@ -377,7 +377,7 @@ async fn _crossfire_bounded_async<T: AsyncTxTrait<usize>, R: AsyncRxTrait<usize>
     for _ in 0..(rx_count - 1) {
         let _rx = rxs.pop().unwrap();
         let _recv_counter = recv_counter.clone();
-        ths.push(tokio::spawn(async move {
+        th_s.push(tokio::spawn(async move {
             loop {
                 match _rx.recv().await {
                     Ok(_) => {
@@ -401,7 +401,7 @@ async fn _crossfire_bounded_async<T: AsyncTxTrait<usize>, R: AsyncRxTrait<usize>
             }
         }
     }
-    for th in ths {
+    for th in th_s {
         let _ = th.await;
     }
     assert!(counter.load(Ordering::Acquire) >= msg_count);

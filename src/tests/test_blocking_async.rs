@@ -63,7 +63,7 @@ async fn test_basic_1_tx_blocking_1_rx_async<T: BlockingTxTrait<usize>, R: Async
 #[case(mpsc::unbounded_async::<usize>())]
 #[case(mpmc::unbounded_async::<usize>())]
 #[tokio::test]
-async fn test_presure_1_tx_blocking_1_rx_async<
+async fn test_pressure_1_tx_blocking_1_rx_async<
     T: BlockingTxTrait<usize>,
     R: AsyncRxTrait<usize>,
 >(
@@ -112,20 +112,20 @@ async fn test_presure_1_tx_blocking_1_rx_async<
 #[case(mpmc::unbounded_async::<usize>(), 100)]
 #[case(mpmc::unbounded_async::<usize>(), 1000)]
 #[tokio::test]
-async fn test_presure_tx_multi_blocking_1_rx_async<R: AsyncRxTrait<usize>>(
+async fn test_pressure_tx_multi_blocking_1_rx_async<R: AsyncRxTrait<usize>>(
     setup_log: (), #[case] channel: (MTx<usize>, R), #[case] tx_count: usize,
 ) {
     let _ = setup_log; // Disable unused var warning
     let (tx, rx) = channel;
     let counter = Arc::new(AtomicUsize::new(0));
     let round = 1000000;
-    let mut tx_ths = Vec::new();
+    let mut tx_th_s = Vec::new();
     let send_msg = Arc::new(AtomicUsize::new(0));
     for _tx_i in 0..tx_count {
         let _tx = tx.clone();
         let _round = round;
         let _send_msg = send_msg.clone();
-        tx_ths.push(thread::spawn(move || {
+        tx_th_s.push(thread::spawn(move || {
             loop {
                 let i = _send_msg.fetch_add(1, Ordering::SeqCst);
                 if i >= round {
@@ -153,7 +153,7 @@ async fn test_presure_tx_multi_blocking_1_rx_async<R: AsyncRxTrait<usize>>(
         }
     }
     assert_eq!(counter.as_ref().load(Ordering::Acquire), round);
-    for th in tx_ths {
+    for th in tx_th_s {
         let _ = th.join();
     }
 }
@@ -177,7 +177,7 @@ async fn test_presure_tx_multi_blocking_1_rx_async<R: AsyncRxTrait<usize>>(
 #[case(mpmc::unbounded_async::<usize>(), 300, 500)]
 #[case(mpmc::unbounded_async::<usize>(), 30, 1000)]
 #[tokio::test]
-async fn test_presure_tx_multi_blocking_multi_rx_async(
+async fn test_pressure_tx_multi_blocking_multi_rx_async(
     setup_log: (), #[case] channel: (MTx<usize>, MAsyncRx<usize>), #[case] tx_count: usize,
     #[case] rx_count: usize,
 ) {
@@ -186,13 +186,13 @@ async fn test_presure_tx_multi_blocking_multi_rx_async(
 
     let counter = Arc::new(AtomicUsize::new(0));
     let round = 1000000;
-    let mut tx_ths = Vec::new();
+    let mut tx_th_s = Vec::new();
     let send_msg = Arc::new(AtomicUsize::new(0));
     for _tx_i in 0..tx_count {
         let _tx = tx.clone();
         let _round = round;
         let _send_msg = send_msg.clone();
-        tx_ths.push(thread::spawn(move || {
+        tx_th_s.push(thread::spawn(move || {
             loop {
                 let i = _send_msg.fetch_add(1, Ordering::SeqCst);
                 if i >= round {
@@ -238,7 +238,7 @@ async fn test_presure_tx_multi_blocking_multi_rx_async(
         }
     }
     assert_eq!(counter.as_ref().load(Ordering::Acquire), round);
-    for th in tx_ths {
+    for th in tx_th_s {
         let _ = th.join();
     }
 }

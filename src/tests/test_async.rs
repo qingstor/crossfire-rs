@@ -285,7 +285,7 @@ async fn test_timeout_recv_async<T: AsyncTxTrait<i32>, R: AsyncRxTrait<i32>>(
 #[case(mpmc::bounded_async::<usize>(100))]
 #[case(mpmc::bounded_async::<usize>(300))]
 #[tokio::test]
-async fn test_presure_bounded_async_1_1<T: AsyncTxTrait<usize>, R: AsyncRxTrait<usize>>(
+async fn test_pressure_bounded_async_1_1<T: AsyncTxTrait<usize>, R: AsyncRxTrait<usize>>(
     setup_log: (), #[case] channel: (T, R),
 ) {
     let _ = setup_log; // Disable unused var warning
@@ -335,7 +335,7 @@ async fn test_presure_bounded_async_1_1<T: AsyncTxTrait<usize>, R: AsyncRxTrait<
 #[case(mpmc::bounded_async::<usize>(100), 100)]
 #[case(mpmc::bounded_async::<usize>(100), 300)]
 #[tokio::test]
-async fn test_presure_bounded_async_multi_1<R: AsyncRxTrait<usize>>(
+async fn test_pressure_bounded_async_multi_1<R: AsyncRxTrait<usize>>(
     setup_log: (), #[case] channel: (MAsyncTx<usize>, R), #[case] tx_count: usize,
 ) {
     let (noti_tx, mut noti_rx) = tokio::sync::mpsc::channel::<usize>(tx_count);
@@ -393,7 +393,7 @@ async fn test_presure_bounded_async_multi_1<R: AsyncRxTrait<usize>>(
 #[case(mpmc::bounded_async::<usize>(100), 10, 100)]
 #[case(mpmc::bounded_async::<usize>(100), 300, 300)]
 #[tokio::test]
-async fn test_presure_bounded_async_multi(
+async fn test_pressure_bounded_async_multi(
     setup_log: (), #[case] channel: (MAsyncTx<usize>, MAsyncRx<usize>), #[case] tx_count: usize,
     #[case] rx_count: usize,
 ) {

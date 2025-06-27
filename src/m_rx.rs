@@ -6,8 +6,7 @@ use crossbeam::channel::Receiver;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
-/// Receiver that works in blocking context, the same with [`Rx<T>`], except that it can be
-/// `clone()`.
+/// Receiver that works in blocking context. MC version of [`Rx<T>`] implements [Clone].
 ///
 /// You can use `into()` to convert it to `Rx<T>`.
 pub struct MRx<T>(pub(crate) Rx<T>);
@@ -44,8 +43,7 @@ impl<T> DerefMut for MRx<T> {
     }
 }
 
-/// Receiver that works in blocking context, the same with [`AsyncRx<T>`], except that it can be
-/// `clone()`.
+/// Receiver that works in async context. MC version of [`AsyncRx<T>`] implements [Clone].
 ///
 /// You can use `into()` to convert it to `AsyncRx<T>`.
 pub struct MAsyncRx<T>(pub(crate) AsyncRx<T>);

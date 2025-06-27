@@ -5,8 +5,7 @@ use crossbeam::channel::Sender;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
-/// Sender that works in blocking context, the same with [`Tx<T>`], except that it can be
-/// `clone()`.
+/// Sender that works in blocking context. MP version of [`Tx<T>`] implements [Clone].
 ///
 /// You can use `into()` to convert it to `Tx<T>`.
 pub struct MTx<T>(pub(crate) Tx<T>);
@@ -43,8 +42,7 @@ impl<T> DerefMut for MTx<T> {
     }
 }
 
-/// Sender that works in blocking context, the same with [`AsyncTx<T>`], except that it can be
-/// `clone()`.
+/// Sender that works in async context, MP version of [`AsyncTx<T>`] implements [Clone].
 ///
 /// You can use `into()` to convert it to `AsyncTx<T>`.
 pub struct MAsyncTx<T>(pub(crate) AsyncTx<T>);

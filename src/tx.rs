@@ -104,12 +104,12 @@ impl<T> Drop for AsyncTx<T> {
 impl<T: Unpin + Send + 'static> AsyncTx<T> {
     /// Send message. Will await when channel is full.
     ///
+    /// **NOTE: Do not call `AsyncTx::send()` concurrently.**
+    /// If you need concurrent access, use [MAsyncTx::send()](crate::MAsyncTx) instead.
+    ///
     /// Returns `Ok(())` on successful.
     ///
     /// Returns Err([SendError]) when all Rx is dropped.
-    ///
-    /// **NOTE: Do not call concurrently.**
-    /// If you need concurrent access, use [MAsyncTx](crate::MAsyncTx) instead.
     #[inline(always)]
     pub async fn send(&self, item: T) -> Result<(), SendError<T>> {
         match self.try_send(item) {
@@ -353,9 +353,9 @@ pub trait AsyncTxTrait<T: Unpin + Send + 'static>: Send + Sync + 'static {
     ///
     /// Returns `Ok(())` when successful.
     ///
-    /// Returns [TrySendError::Full] on channel full for bounded channel.
+    /// Returns Err([TrySendError::Full]) on channel full for bounded channel.
     ///
-    /// Returns [TrySendError::Disconnected] when all Rx dropped.
+    /// Returns Err([TrySendError::Disconnected]) when all Rx dropped.
     fn try_send(&self, item: T) -> Result<(), TrySendError<T>>;
 
     /// Probe possible messages in the channel (not accurate)

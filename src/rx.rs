@@ -38,7 +38,7 @@ impl<T> Rx<T> {
     ///
     /// Returns Ok(T) when successful.
     ///
-    /// Returns [RecvError] when all Tx dropped.
+    /// Returns Err([RecvError]) when all Tx dropped.
     #[inline]
     pub fn recv<'a>(&'a self) -> Result<T, RecvError> {
         match self.recv.recv() {
@@ -54,9 +54,9 @@ impl<T> Rx<T> {
     ///
     /// Returns Ok(T) when successful.
     ///
-    /// Returns [TryRecvError::Empty] when channel is empty.
+    /// Returns Err([TryRecvError::Empty]) when channel is empty.
     ///
-    /// returns [TryRecvError::Disconnected] when all Tx dropped.
+    /// returns Err([TryRecvError::Disconnected]) when all Tx dropped.
     #[inline]
     pub fn try_recv(&self) -> Result<T, TryRecvError> {
         match self.recv.try_recv() {
@@ -118,12 +118,12 @@ impl<T> AsyncRx<T> {
 
     /// Receive message, will await when channel is empty.
     ///
-    /// Returns Ok(T) when successful.
-    ///
-    /// returns [RecvError] when all Tx dropped.
-    ///
-    /// **NOTE: Do not call concurrently.**
+    /// **NOTE: Do not call `AsyncRx::recv()` concurrently.**
     /// If you need concurrent access, use [MAsyncRx](crate::MAsyncRx) instead.
+    ///
+    /// Returns `Ok(T)` when successful.
+    ///
+    /// returns Err([RecvError]) when all Tx dropped.
     #[inline(always)]
     pub async fn recv(&self) -> Result<T, RecvError> {
         match self.try_recv() {
@@ -139,11 +139,11 @@ impl<T> AsyncRx<T> {
 
     /// Try to receive message, non-blocking.
     ///
-    /// Returns Ok(T) on successful.
+    /// Returns `Ok(T)` on successful.
     ///
-    /// Returns [TryRecvError::Empty] when channel is empty.
+    /// Returns Err([TryRecvError::Empty]) when channel is empty.
     ///
-    /// Returns [TryRecvError::Disconnected] when all Tx dropped.
+    /// Returns Err([TryRecvError::Disconnected]) when all Tx dropped.
     #[inline(always)]
     pub fn try_recv(&self) -> Result<T, TryRecvError> {
         match self.recv.try_recv() {
@@ -175,7 +175,7 @@ impl<T> AsyncRx<T> {
 
     /// This is only useful when you're writing your own future.
     ///
-    /// Returns Ok(T) on receiving message.
+    /// Returns `Ok(T)` on successful.
     ///
     /// Return Err([TryRecvError::Empty]) for Poll::Pending case.
     ///
@@ -313,18 +313,18 @@ impl<T> From<MAsyncRx<T>> for AsyncRx<T> {
 pub trait BlockingRxTrait<T: Send + 'static>: Send + 'static {
     /// Receive message, will block when channel is empty.
     ///
-    /// Returns Ok(T) when successful.
+    /// Returns `Ok(T)` when successful.
     ///
-    /// Returns [RecvError] when all Tx dropped.
+    /// Returns Err([RecvError]) when all Tx dropped.
     fn recv<'a>(&'a self) -> Result<T, RecvError>;
 
     /// Try to receive message, non-blocking.
     ///
-    /// Returns Ok(T) when successful.
+    /// Returns `Ok(T)` when successful.
     ///
-    /// Returns [TryRecvError::Empty] when channel is empty.
+    /// Returns Err([TryRecvError::Empty]) when channel is empty.
     ///
-    /// Returns [TryRecvError::Disconnected] when all Tx dropped.
+    /// Returns Err([TryRecvError::Disconnected]) when all Tx dropped.
     fn try_recv(&self) -> Result<T, TryRecvError>;
 
     /// Probe possible messages in the channel (not accurate)
@@ -361,18 +361,18 @@ impl<T: Send + 'static> BlockingRxTrait<T> for Rx<T> {
 pub trait AsyncRxTrait<T: Unpin + Send + 'static>: Send + Sync + 'static {
     /// Receive message, will await when channel is empty.
     ///
-    /// Returns Ok(T) when successful.
+    /// Returns `Ok(T)` when successful.
     ///
-    /// returns [RecvError] when all Tx dropped.
+    /// returns Err([RecvError]) when all Tx dropped.
     async fn recv(&self) -> Result<T, RecvError>;
 
     /// Try to receive message, non-blocking.
     ///
     /// Returns Ok(T) when successful.
     ///
-    /// Returns [TryRecvError::Empty] when channel is empty.
+    /// Returns Err([TryRecvError::Empty]) when channel is empty.
     ///
-    /// Returns [TryRecvError::Disconnected] when all Tx dropped.
+    /// Returns Err([TryRecvError::Disconnected]) when all Tx dropped.
     fn try_recv(&self) -> Result<T, TryRecvError>;
 
     /// Generate a fixed Sized future object that receive a message

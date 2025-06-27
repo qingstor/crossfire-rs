@@ -27,7 +27,7 @@
 //!
 //! Benchmark is written in criterion framework. You can run benchmark by:
 //!
-//! ```
+//! ``` shell
 //! cargo bench
 //! ```
 //!
@@ -113,9 +113,11 @@
 //!
 //! extern crate crossfire;
 //! use crossfire::*;
+//! #[macro_use]
+//! extern crate tokio;
 //!
 //! #[tokio::main]
-//! async main() {
+//! async fn main() {
 //!     let (tx, rx) = mpsc::bounded_async::<i32>(100);
 //!     tokio::spawn(async move {
 //!        for i in 0i32..10000 {

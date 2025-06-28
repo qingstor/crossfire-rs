@@ -158,8 +158,8 @@ fn _flume_bounded_sync(bound: usize, tx_count: usize, rx_count: usize, msg_count
     assert!(recv_counter.load(Ordering::Acquire) >= msg_count);
 }
 
-async fn _flume_unbounded_async(bound: usize, tx_count: usize, rx_count: usize, msg_count: usize) {
-    let (tx, rx) = flume::bounded(bound);
+async fn _flume_unbounded_async(tx_count: usize, rx_count: usize, msg_count: usize) {
+    let (tx, rx) = flume::unbounded();
     let counter = Arc::new(AtomicUsize::new(0));
     let mut th_s = Vec::new();
     for _tx_i in 0..tx_count {
@@ -476,7 +476,7 @@ fn bench_flume_unbounded_async(c: &mut Criterion) {
         group.throughput(Throughput::Elements(ONE_MILLION as u64));
         group.bench_with_input(BenchmarkId::new("mpsc unbounded", &param), &param, |b, i| {
             b.to_async(get_runtime())
-                .iter(|| _flume_unbounded_async(100, i.tx_count, i.rx_count, ONE_MILLION))
+                .iter(|| _flume_unbounded_async(i.tx_count, i.rx_count, ONE_MILLION))
         });
     }
     for input in [(2, 2), (4, 4), (8, 8), (16, 16)] {
@@ -484,7 +484,7 @@ fn bench_flume_unbounded_async(c: &mut Criterion) {
         group.throughput(Throughput::Elements(ONE_MILLION as u64));
         group.bench_with_input(BenchmarkId::new("mpmc unbounded", &param), &param, |b, i| {
             b.to_async(get_runtime())
-                .iter(|| _flume_unbounded_async(100, i.tx_count, i.rx_count, ONE_MILLION))
+                .iter(|| _flume_unbounded_async(i.tx_count, i.rx_count, ONE_MILLION))
         });
     }
 }

@@ -7,12 +7,12 @@ RUNTESTCASE = _run_test_case() {                                                
     fi  \
 }
 
-RUNBENCHCASE = _run_bench_case() {                                                  \
+RUNRELEASECASE = _run_test_release_case() {                                                  \
     case="$(filter-out $@,$(MAKECMDGOALS))";                                      \
     if [ -n "$${case}" ]; then                                                    \
         RUST_BACKTRACE=full cargo test $${case} --release -- --nocapture --test-threads=1;  \
     else                                                                          \
-        echo should specify test case;                                            \
+        RUST_BACKTRACE=full cargo test --release -- --nocapture --test-threads=1;                                            \
     fi  \
 }
 
@@ -38,9 +38,9 @@ test: init
 	@${RUNTESTCASE}; _run_test_case
 	@echo "Done"
 
-.PHONY: bench
-bench:
-	@${RUNBENCHCASE}; _run_bench_case
+.PHONY: test_release
+test_release:
+	@${RUNRELEASECASE}; _run_test_release_case
 
 .PHONY: build
 build: init

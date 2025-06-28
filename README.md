@@ -16,6 +16,8 @@ High-performance spsc/mpsc/mpmc channels.
 It supports async context, or communicates between async-blocking context.
 
 Implemented with lockless in mind, low level is based on crossbeam-channel.
+For the concept, please refer to [wiki](https://github.com/frostyplanet/crossfire-rs/wiki).
+
 
 ## Stability and versions
 

@@ -5,6 +5,7 @@
 //! It supports async context, and bridge the gap between async and blocking context.
 //!
 //! Implemented with lockless in mind, low level is based on crossbeam-channel.
+//! For the concept, please refer to [wiki](https://github.com/frostyplanet/crossfire-rs/wiki).
 //!
 //! ## Stability and versions
 //!

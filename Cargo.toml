@@ -31,6 +31,7 @@ atomic-waitgroup = "0"
 criterion = { version="0.6", features = ["async_tokio", "csv_output"] }
 
 flume = {version="0.11", features= ["async"] }
+kanal = {version="0.1"}
 
 [[bench]]
 name = "crossfire_bench"

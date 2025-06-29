@@ -29,12 +29,11 @@ impl Clone for LockedWaker {
 
 pub struct LockedWakerRef {
     w: Weak<LockedWakerInner>,
-    seq: u64,
 }
 
 impl fmt::Debug for LockedWakerRef {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "LockedWakerRef({})", self.seq)
+        write!(f, "LockedWakerRef")
     }
 }
 
@@ -63,7 +62,7 @@ impl LockedWaker {
 
     #[inline(always)]
     pub(crate) fn weak(&self) -> LockedWakerRef {
-        LockedWakerRef { seq: self.0.seq, w: Arc::downgrade(&self.0) }
+        LockedWakerRef { w: Arc::downgrade(&self.0) }
     }
 
     #[inline(always)]
@@ -95,20 +94,22 @@ impl LockedWakerRef {
 
     /// return true to stop; return false to continue the search.
     pub(crate) fn try_to_clear(&self, seq: u64) -> bool {
-        if self.seq == seq {
-            // It's my waker, stopped
-            return true;
-        }
         if let Some(w) = self.w.upgrade() {
             let waker = LockedWaker(w);
+            let _seq = waker.get_seq();
+            if _seq == seq {
+                // It's my waker, stopped
+                return true;
+            }
             if !waker.is_waked() {
                 waker.wake();
                 // other future is before me, but not canceled, i should stop.
                 // we do not known push back may have concurrent problem
                 return true;
             }
+            return _seq > seq;
         }
-        return self.seq > seq;
+        return false;
     }
 }
 

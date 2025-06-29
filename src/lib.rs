@@ -148,6 +148,9 @@ mod locked_waker;
 mod waker_registry;
 pub use locked_waker::LockedWaker;
 
+/// collections that can be re-used
+pub mod collections;
+
 /// Multi producers, single consumer
 pub mod mpmc;
 /// Multi producers, multi consumers

@@ -1,5 +1,5 @@
 use crate::locked_waker::*;
-use crossbeam::queue::{ArrayQueue, SegQueue};
+use crossbeam::queue::SegQueue;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::task::Context;
 
@@ -71,13 +71,13 @@ impl RegistryTrait for RegistryDummy {
 }
 
 pub struct RegistrySingle {
-    queue: ArrayQueue<LockedWakerRef>,
+    cell: WakerCell,
 }
 
 impl RegistrySingle {
     #[inline(always)]
     pub fn new() -> Registry {
-        Registry::Single(Self { queue: ArrayQueue::new(1) })
+        Registry::Single(Self { cell: WakerCell::new() })
     }
 }
 
@@ -98,44 +98,30 @@ impl RegistryTrait for RegistrySingle {
                 _waker
             }
         };
-        match self.queue.push(waker.weak()) {
-            Ok(_) => {}
-            Err(_weak) => {
-                let _old_waker = self.queue.pop();
-                self.queue.push(_weak).expect("push wake ok after pop");
-            }
-        }
+        self.cell.put(waker.weak());
         false
     }
 
     #[inline(always)]
     fn reg_blocking(&self, waker: &LockedWaker) {
-        match self.queue.push(waker.weak()) {
-            Ok(_) => {}
-            Err(_weak) => {
-                let _old_waker = self.queue.pop();
-                self.queue.push(_weak).expect("push wake ok after pop");
-            }
-        }
+        self.cell.put(waker.weak());
     }
 
     #[inline(always)]
     fn cancel_waker(&self, _waker: LockedWaker) {
         // Got to be it, because only one single thread.
-        let _ = self.queue.pop();
+        self.cell.clear();
     }
 
     #[inline(always)]
     fn clear_wakers(&self, _seq: u64) {
         // Got to be it, because only one single thread.
-        let _ = self.queue.pop();
+        self.cell.clear();
     }
 
     #[inline(always)]
     fn fire(&self) {
-        if let Some(waker) = self.queue.pop() {
-            waker.wake();
-        }
+        let _ = self.cell.wake();
     }
 
     #[inline(always)]
@@ -146,7 +132,11 @@ impl RegistryTrait for RegistrySingle {
     /// return waker queue size
     #[inline(always)]
     fn get_size(&self) -> usize {
-        self.queue.len()
+        if self.cell.exists() {
+            1
+        } else {
+            0
+        }
     }
 }
 

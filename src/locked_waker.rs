@@ -1,3 +1,4 @@
+use crate::collections::SpmcCell;
 use std::fmt;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
@@ -16,8 +17,8 @@ impl fmt::Debug for LockedWaker {
 }
 
 struct LockedWakerInner {
-    waker: std::task::Waker,
     waked: AtomicBool,
+    waker: std::task::Waker,
     seq: u64,
 }
 
@@ -73,10 +74,9 @@ impl LockedWaker {
     /// return true on suc wake up, false when already woken up.
     #[inline(always)]
     pub(crate) fn wake(&self) -> bool {
-        let _self = self.0.as_ref();
-        let waked = _self.waked.swap(true, Ordering::SeqCst);
+        let waked = self.0.waked.swap(true, Ordering::Acquire);
         if waked == false {
-            _self.waker.wake_by_ref();
+            self.0.waker.wake_by_ref();
         }
         return !waked;
     }
@@ -113,7 +113,40 @@ impl LockedWakerRef {
     }
 }
 
-#[test]
-fn test_waker() {
-    println!("waker size {}", std::mem::size_of::<LockedWakerRef>());
+pub struct WakerCell(SpmcCell<LockedWakerInner>);
+
+impl WakerCell {
+    #[inline(always)]
+    pub fn new() -> Self {
+        Self(SpmcCell::new())
+    }
+
+    #[inline(always)]
+    pub fn wake(&self) -> bool {
+        if let Some(waker) = self.0.pop() {
+            return LockedWaker(waker).wake();
+        }
+        false
+    }
+
+    #[inline(always)]
+    pub fn clear(&self) {
+        self.0.clear();
+    }
+
+    #[inline(always)]
+    pub fn put(&self, waker: &LockedWaker) {
+        self.0.put(&waker.0);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_waker() {
+        println!("waker size {}", std::mem::size_of::<LockedWakerRef>());
+        println!("arc size {}", std::mem::size_of::<Arc<WakerCell>>());
+        println!("arc size {}", std::mem::size_of::<Weak<WakerCell>>());
+    }
 }

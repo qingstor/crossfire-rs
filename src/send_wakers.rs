@@ -1,5 +1,5 @@
 use crate::locked_waker::*;
-use crossbeam::queue::{ArrayQueue, SegQueue};
+use crossbeam::queue::SegQueue;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::task::Context;
 
@@ -63,13 +63,13 @@ impl SendWakersTrait for SendWakersBlocking {
 }
 
 pub struct SendWakersSingle {
-    sender_waker: ArrayQueue<LockedWakerRef>,
+    cell: WakerCell,
 }
 
 impl SendWakersSingle {
     #[inline(always)]
     pub fn new() -> SendWakers {
-        SendWakers::Single(Self { sender_waker: ArrayQueue::new(1) })
+        SendWakers::Single(Self { cell: WakerCell::new() })
     }
 }
 
@@ -77,34 +77,23 @@ impl SendWakersTrait for SendWakersSingle {
     #[inline(always)]
     fn reg_send(&self, ctx: &mut Context) -> LockedWaker {
         let waker = LockedWaker::new(ctx, 0);
-        let weak = waker.weak();
-        match self.sender_waker.push(weak) {
-            Ok(_) => {}
-            Err(_weak) => {
-                let _old_waker = self.sender_waker.pop();
-                self.sender_waker.push(_weak).expect("push wake ok after pop");
-            }
-        }
+        self.cell.put(&waker);
         waker
     }
 
     #[inline(always)]
     fn clear_send_wakers(&self, _seq: u64) {
-        // It got to be it, because only one single thread.
-        let _ = self.sender_waker.pop();
+        self.cell.clear();
     }
 
     #[inline(always)]
     fn cancel_send_waker(&self, _waker: LockedWaker) {
-        // It got to be it, because only one single thread.
-        let _ = self.sender_waker.pop();
+        //        self.cell.clear();
     }
 
     #[inline(always)]
     fn on_recv(&self) {
-        if let Some(waker) = self.sender_waker.pop() {
-            waker.wake();
-        }
+        self.cell.wake();
     }
 
     #[inline]

@@ -154,6 +154,9 @@ mod send_wakers;
 /// Single producer, single consumer
 pub mod spsc;
 pub use locked_waker::LockedWaker;
+/// collections that can be re-used
+pub mod collections;
+
 mod rx;
 pub use rx::*;
 mod m_rx;

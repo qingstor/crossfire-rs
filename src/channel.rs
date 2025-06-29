@@ -6,10 +6,10 @@ use std::sync::Arc;
 use std::task::Context;
 
 pub struct ChannelShared {
-    tx_count: AtomicU64,
-    rx_count: AtomicU64,
     recvs: RecvWakers,
     senders: SendWakers,
+    tx_count: AtomicU64,
+    rx_count: AtomicU64,
 }
 
 impl ChannelShared {

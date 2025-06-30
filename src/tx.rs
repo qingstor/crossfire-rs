@@ -1,7 +1,7 @@
 use crate::channel::*;
 use async_trait::async_trait;
-pub use crossbeam::channel::{SendError, TrySendError};
-use crossbeam::channel::{SendTimeoutError, Sender};
+use crossbeam::channel::Sender;
+pub use crossbeam::channel::{SendError, SendTimeoutError, TrySendError};
 use std::fmt;
 use std::future::Future;
 use std::pin::Pin;

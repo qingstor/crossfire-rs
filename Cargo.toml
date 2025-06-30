@@ -11,6 +11,7 @@ documentation = "https://docs.rs/crossfire"
 keywords = ["async", "non-blocking", "lock-free", "channel"]
 categories = ["concurrency", "data-structures"]
 exclude = ["/ci/*", "/bors.toml"]
+description = "channels for async and threads"
 rust-version = "1.61"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

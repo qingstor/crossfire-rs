@@ -3,12 +3,14 @@ use crate::m_rx::*;
 use crate::stream::AsyncStream;
 use async_trait::async_trait;
 use crossbeam::channel::Receiver;
+use crossbeam::channel::RecvTimeoutError;
 pub use crossbeam::channel::{RecvError, TryRecvError};
 use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
+use std::time::Duration;
 
 /// Receiver that works in blocking context
 pub struct Rx<T> {
@@ -60,6 +62,25 @@ impl<T> Rx<T> {
     #[inline]
     pub fn try_recv(&self) -> Result<T, TryRecvError> {
         match self.recv.try_recv() {
+            Err(e) => return Err(e),
+            Ok(i) => {
+                self.shared.on_recv();
+                return Ok(i);
+            }
+        }
+    }
+
+    /// Waits for a message to be received from the channel, but only for a limited time.
+    /// Will block when channel is empty.
+    ///
+    /// Returns Ok(T) when successful.
+    ///
+    /// Returns Err([TryRecvError::Empty]) when channel is empty.
+    ///
+    /// returns Err([TryRecvError::Disconnected]) when all Tx dropped.
+    #[inline]
+    pub fn recv_timeout(&self, timeout: Duration) -> Result<T, RecvTimeoutError> {
+        match self.recv.recv_timeout(timeout) {
             Err(e) => return Err(e),
             Ok(i) => {
                 self.shared.on_recv();
@@ -327,6 +348,16 @@ pub trait BlockingRxTrait<T: Send + 'static>: Send + 'static {
     /// Returns Err([TryRecvError::Disconnected]) when all Tx dropped.
     fn try_recv(&self) -> Result<T, TryRecvError>;
 
+    /// Waits for a message to be received from the channel, but only for a limited time.
+    /// Will block when channel is empty.
+    ///
+    /// Returns Ok(T) when successful.
+    ///
+    /// Returns Err([TryRecvError::Empty]) when channel is empty.
+    ///
+    /// returns Err([TryRecvError::Disconnected]) when all Tx dropped.
+    fn recv_timeout(&self, timeout: Duration) -> Result<T, RecvTimeoutError>;
+
     /// Probe possible messages in the channel (not accurate)
     fn len(&self) -> usize;
 
@@ -343,6 +374,11 @@ impl<T: Send + 'static> BlockingRxTrait<T> for Rx<T> {
     #[inline(always)]
     fn try_recv(&self) -> Result<T, TryRecvError> {
         Rx::try_recv(self)
+    }
+
+    #[inline(always)]
+    fn recv_timeout(&self, timeout: Duration) -> Result<T, RecvTimeoutError> {
+        Rx::recv_timeout(self, timeout)
     }
 
     #[inline(always)]

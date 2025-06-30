@@ -1,9 +1,11 @@
 use crate::channel::*;
 use crate::tx::*;
 use async_trait::async_trait;
+use crossbeam::channel::SendTimeoutError;
 use crossbeam::channel::Sender;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
+use std::time::Duration;
 
 /// Sender that works in blocking context. MP version of [`Tx<T>`] implements [Clone].
 ///
@@ -88,6 +90,11 @@ impl<T: Send + 'static> BlockingTxTrait<T> for MTx<T> {
     #[inline(always)]
     fn try_send(&self, item: T) -> Result<(), TrySendError<T>> {
         self.0.try_send(item)
+    }
+
+    #[inline(always)]
+    fn send_timeout(&self, item: T, timeout: Duration) -> Result<(), SendTimeoutError<T>> {
+        self.0.send_timeout(item, timeout)
     }
 
     #[inline(always)]

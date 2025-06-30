@@ -73,9 +73,9 @@ impl<T> Tx<T> {
     ///
     /// Returns `Ok(())` when successful.
     ///
-    /// Returns Err([TrySendError::Full]) on channel full for bounded channel.
+    /// Returns Err([SendTimeoutError::Timeout]) when the message could not be sent because the channel is full and the operation timed out.
     ///
-    /// Returns Err([TrySendError::Disconnected]) when all Rx dropped.
+    /// Returns Err([SendTimeoutError::Disconnected]) when all Rx dropped.
     #[inline]
     pub fn send_timeout(&self, item: T, timeout: Duration) -> Result<(), SendTimeoutError<T>> {
         match self.sender.send_timeout(item, timeout) {
@@ -331,9 +331,9 @@ pub trait BlockingTxTrait<T: Send + 'static>: Send + 'static {
     ///
     /// Returns `Ok(())` when successful.
     ///
-    /// Returns Err([TrySendError::Full]) on channel full for bounded channel.
+    /// Returns Err([SendTimeoutError::Timeout]) when the message could not be sent because the channel is full and the operation timed out.
     ///
-    /// Returns Err([TrySendError::Disconnected]) when all Rx dropped.
+    /// Returns Err([SendTimeoutError::Disconnected]) when all Rx dropped.
     fn send_timeout(&self, item: T, timeout: Duration) -> Result<(), SendTimeoutError<T>>;
 
     /// Probe possible messages in the channel (not accurate)

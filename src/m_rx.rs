@@ -3,8 +3,10 @@ use crate::rx::*;
 use crate::stream::AsyncStream;
 use async_trait::async_trait;
 use crossbeam::channel::Receiver;
+use crossbeam::channel::RecvTimeoutError;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
+use std::time::Duration;
 
 /// Receiver that works in blocking context. MC version of [`Rx<T>`] implements [Clone].
 ///
@@ -97,6 +99,11 @@ impl<T: Send + 'static> BlockingRxTrait<T> for MRx<T> {
     #[inline(always)]
     fn try_recv(&self) -> Result<T, TryRecvError> {
         self.0.try_recv()
+    }
+
+    #[inline(always)]
+    fn recv_timeout(&self, timeout: Duration) -> Result<T, RecvTimeoutError> {
+        self.0.recv_timeout(timeout)
     }
 
     /// Probe possible messages in the channel (not accurate)

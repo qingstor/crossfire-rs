@@ -1,12 +1,13 @@
 use crate::channel::*;
 use async_trait::async_trait;
 use crossbeam::channel::Sender;
-pub use crossbeam::channel::{SendError, TrySendError};
+pub use crossbeam::channel::{SendError, SendTimeoutError, TrySendError};
 use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
+use std::time::Duration;
 
 /// Sender that works in blocking context
 pub struct Tx<T> {
@@ -62,6 +63,25 @@ impl<T> Tx<T> {
             Err(e) => return Err(e),
             Ok(_) => {
                 self.shared.on_send();
+                return Ok(());
+            }
+        }
+    }
+
+    /// Waits for a message to be sent into the channel, but only for a limited time.
+    /// Will block when channel is empty.
+    ///
+    /// Returns `Ok(())` when successful.
+    ///
+    /// Returns Err([SendTimeoutError::Timeout]) when the message could not be sent because the channel is full and the operation timed out.
+    ///
+    /// Returns Err([SendTimeoutError::Disconnected]) when all Rx dropped.
+    #[inline]
+    pub fn send_timeout(&self, item: T, timeout: Duration) -> Result<(), SendTimeoutError<T>> {
+        match self.sender.send_timeout(item, timeout) {
+            Err(e) => return Err(e),
+            Ok(_) => {
+                self.shared.on_recv();
                 return Ok(());
             }
         }
@@ -306,6 +326,16 @@ pub trait BlockingTxTrait<T: Send + 'static>: Send + 'static {
     /// Returns Err([TrySendError::Disconnected]) when all Rx dropped.
     fn try_send(&self, _item: T) -> Result<(), TrySendError<T>>;
 
+    /// Waits for a message to be sent into the channel, but only for a limited time.
+    /// Will block when channel is empty.
+    ///
+    /// Returns `Ok(())` when successful.
+    ///
+    /// Returns Err([SendTimeoutError::Timeout]) when the message could not be sent because the channel is full and the operation timed out.
+    ///
+    /// Returns Err([SendTimeoutError::Disconnected]) when all Rx dropped.
+    fn send_timeout(&self, item: T, timeout: Duration) -> Result<(), SendTimeoutError<T>>;
+
     /// Probe possible messages in the channel (not accurate)
     fn len(&self) -> usize;
 
@@ -322,6 +352,11 @@ impl<T: Send + 'static> BlockingTxTrait<T> for Tx<T> {
     #[inline(always)]
     fn try_send(&self, item: T) -> Result<(), TrySendError<T>> {
         Tx::try_send(self, item)
+    }
+
+    #[inline(always)]
+    fn send_timeout(&self, item: T, timeout: Duration) -> Result<(), SendTimeoutError<T>> {
+        Tx::send_timeout(&self, item, timeout)
     }
 
     #[inline(always)]

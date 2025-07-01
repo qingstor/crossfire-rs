@@ -2,8 +2,8 @@ use super::common::*;
 use crate::*;
 use log::*;
 use rstest::*;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
@@ -44,6 +44,58 @@ async fn test_basic_1_tx_async_1_rx_blocking<T: AsyncTxTrait<usize>, R: Blocking
             }
         }
     }
+    let res = rx.recv();
+    assert!(res.is_err());
+    rt.shutdown_background(); // Prevent panic on runtime drop
+}
+
+#[rstest]
+#[case(spsc::bounded_tx_async_rx_blocking::<usize>(100))]
+#[case(mpsc::bounded_tx_async_rx_blocking::<usize>(100))]
+#[case(mpmc::bounded_tx_async_rx_blocking::<usize>(100))]
+#[tokio::test]
+async fn test_timeout_1_tx_async_1_rx_blocking<
+    T: AsyncTxTrait<usize>,
+    R: BlockingRxTrait<usize>,
+>(
+    setup_log: (), #[case] channel: (T, R),
+) {
+    let _ = setup_log; // Disable unused var warning
+    let (tx, rx) = channel;
+
+    let rx_res = rx.try_recv();
+    assert!(rx_res.is_err());
+    assert!(rx_res.unwrap_err().is_empty());
+    let batch_1: usize = 100;
+    let batch_2: usize = 200;
+    let rt = get_runtime();
+    rt.spawn(async move {
+        for i in 0..batch_1 {
+            let tx_res = tx.send(i).await;
+            assert!(tx_res.is_ok());
+        }
+        for i in batch_1..(batch_1 + batch_2) {
+            assert!(tx.send(10 + i).await.is_ok());
+            tokio::time::sleep(Duration::from_millis(2)).await;
+        }
+
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        assert!(tx.send(123).await.is_ok());
+    });
+    for _ in 0..(batch_1 + batch_2) {
+        match rx.recv() {
+            Ok(i) => {
+                debug!("recv {}", i);
+            }
+            Err(e) => {
+                panic!("error {}", e);
+            }
+        }
+    }
+
+    assert!(rx.recv_timeout(Duration::from_millis(100)).is_err());
+    assert!(rx.recv_timeout(Duration::from_millis(200)).is_ok());
+
     let res = rx.recv();
     assert!(res.is_err());
     rt.shutdown_background(); // Prevent panic on runtime drop

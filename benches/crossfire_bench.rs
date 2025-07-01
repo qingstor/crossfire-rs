@@ -1,8 +1,8 @@
 use criterion::*;
 use crossfire::*;
 use std::sync::{
-    Arc,
     atomic::{AtomicUsize, Ordering},
+    Arc,
 };
 use std::time::Duration;
 use std::{fmt, thread};
@@ -30,14 +30,12 @@ fn _crossbeam_bounded_sync(bound: usize, tx_count: usize, rx_count: usize, msg_c
     for _ in 0..tx_count {
         let _send_counter = send_counter.clone();
         let _tx = tx.clone();
-        th_s.push(thread::spawn(move || {
-            loop {
-                let i = _send_counter.fetch_add(1, Ordering::SeqCst);
-                if i < msg_count {
-                    _tx.send(i).expect("send");
-                } else {
-                    break;
-                }
+        th_s.push(thread::spawn(move || loop {
+            let i = _send_counter.fetch_add(1, Ordering::SeqCst);
+            if i < msg_count {
+                _tx.send(i).expect("send");
+            } else {
+                break;
             }
         }));
     }
@@ -45,15 +43,13 @@ fn _crossbeam_bounded_sync(bound: usize, tx_count: usize, rx_count: usize, msg_c
     for _ in 0..(rx_count - 1) {
         let _rx = rx.clone();
         let _recv_counter = recv_counter.clone();
-        th_s.push(thread::spawn(move || {
-            loop {
-                match _rx.recv() {
-                    Ok(_) => {
-                        let _ = _recv_counter.fetch_add(1, Ordering::SeqCst);
-                    }
-                    Err(_) => {
-                        break;
-                    }
+        th_s.push(thread::spawn(move || loop {
+            match _rx.recv() {
+                Ok(_) => {
+                    let _ = _recv_counter.fetch_add(1, Ordering::SeqCst);
+                }
+                Err(_) => {
+                    break;
                 }
             }
         }));
@@ -110,16 +106,14 @@ fn _flume_bounded_sync(bound: usize, tx_count: usize, rx_count: usize, msg_count
     for _tx_i in 0..tx_count {
         let _send_counter = send_counter.clone();
         let _tx = tx.clone();
-        th_s.push(thread::spawn(move || {
-            loop {
-                let i = _send_counter.fetch_add(1, Ordering::SeqCst);
-                if i < msg_count {
-                    if let Err(e) = _tx.send(i) {
-                        panic!("send error: {:?}", e);
-                    }
-                } else {
-                    break;
+        th_s.push(thread::spawn(move || loop {
+            let i = _send_counter.fetch_add(1, Ordering::SeqCst);
+            if i < msg_count {
+                if let Err(e) = _tx.send(i) {
+                    panic!("send error: {:?}", e);
                 }
+            } else {
+                break;
             }
         }));
     }
@@ -128,15 +122,13 @@ fn _flume_bounded_sync(bound: usize, tx_count: usize, rx_count: usize, msg_count
     for _ in 0..(rx_count - 1) {
         let _rx = rx.clone();
         let _rx_counter = recv_counter.clone();
-        th_s.push(thread::spawn(move || {
-            loop {
-                match _rx.recv() {
-                    Ok(_) => {
-                        let _ = _rx_counter.fetch_add(1, Ordering::SeqCst);
-                    }
-                    Err(_) => {
-                        break;
-                    }
+        th_s.push(thread::spawn(move || loop {
+            match _rx.recv() {
+                Ok(_) => {
+                    let _ = _rx_counter.fetch_add(1, Ordering::SeqCst);
+                }
+                Err(_) => {
+                    break;
                 }
             }
         }));
@@ -409,16 +401,14 @@ async fn _crossfire_blocking_async<T: BlockingTxTrait<usize>, R: AsyncRxTrait<us
     let mut sender_th_s = Vec::new();
     for tx in txs {
         let _counter = counter.clone();
-        sender_th_s.push(thread::spawn(move || {
-            loop {
-                let i = _counter.fetch_add(1, Ordering::SeqCst);
-                if i < msg_count {
-                    if let Err(e) = tx.send(i) {
-                        panic!("send error: {:?}", e);
-                    }
-                } else {
-                    break;
+        sender_th_s.push(thread::spawn(move || loop {
+            let i = _counter.fetch_add(1, Ordering::SeqCst);
+            if i < msg_count {
+                if let Err(e) = tx.send(i) {
+                    panic!("send error: {:?}", e);
                 }
+            } else {
+                break;
             }
         }));
     }

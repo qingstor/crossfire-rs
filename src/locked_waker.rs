@@ -1,7 +1,7 @@
 use std::fmt;
 use std::sync::{
-    Arc, Weak,
     atomic::{AtomicBool, Ordering},
+    Arc, Weak,
 };
 use std::task::*;
 

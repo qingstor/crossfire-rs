@@ -3,8 +3,8 @@ use crate::*;
 use log::*;
 use rstest::*;
 use std::sync::{
-    Arc,
     atomic::{AtomicUsize, Ordering},
+    Arc,
 };
 use tokio::time::*;
 
@@ -156,7 +156,7 @@ async fn test_basic_unbounded_idle_select<T: BlockingTxTrait<i32>, R: AsyncRxTra
     let _ = setup_log; // Disable unused var warning
     let (_tx, rx) = channel;
 
-    use futures::{FutureExt, pin_mut, select};
+    use futures::{pin_mut, select, FutureExt};
 
     async fn loop_fn() {
         tokio::time::sleep(Duration::from_millis(1)).await;

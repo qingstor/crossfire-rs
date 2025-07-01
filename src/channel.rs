@@ -1,8 +1,8 @@
 pub use super::recv_wakers::*;
 pub use super::send_wakers::*;
 pub use crate::locked_waker::*;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use std::task::Context;
 
 pub struct ChannelShared {

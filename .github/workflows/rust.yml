@@ -2,7 +2,10 @@ name: Rust
 
 on:
   pull_request:
-    branches: [ master ]
+    types:
+      - opened
+      - synchronize
+      - ready_for_review
   schedule: [cron: "0 */5 * * *"]
   workflow_dispatch:
 

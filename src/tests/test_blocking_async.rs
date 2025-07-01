@@ -3,8 +3,8 @@ use crate::*;
 use log::*;
 use rstest::*;
 use std::sync::{
-    Arc,
     atomic::{AtomicUsize, Ordering},
+    Arc,
 };
 use std::thread;
 use std::time::*;
@@ -36,6 +36,54 @@ async fn test_basic_1_tx_blocking_1_rx_async<T: BlockingTxTrait<usize>, R: Async
         assert!(tx.send(11).is_ok());
     });
     for i in 0usize..12 {
+        match rx.recv().await {
+            Ok(j) => {
+                debug!("recv {}", i);
+                assert_eq!(i, j);
+            }
+            Err(e) => {
+                panic!("error {}", e);
+            }
+        }
+    }
+    let res = rx.recv().await;
+    assert!(res.is_err());
+    debug!("rx close");
+    let _ = th.join();
+}
+
+#[rstest]
+#[case(spsc::bounded_tx_blocking_rx_async::<usize>(10))]
+#[case(mpsc::bounded_tx_blocking_rx_async::<usize>(10))]
+#[case(mpmc::bounded_tx_blocking_rx_async::<usize>(10))]
+#[tokio::test]
+async fn test_timeout_1_tx_blocking_1_rx_async<
+    T: BlockingTxTrait<usize>,
+    R: AsyncRxTrait<usize>,
+>(
+    setup_log: (), #[case] channel: (T, R),
+) {
+    let _ = setup_log; // Disable unused var warning
+    let (tx, rx) = channel;
+    let rx_res = rx.try_recv();
+    assert!(rx_res.is_err());
+    assert!(rx_res.unwrap_err().is_empty());
+    for i in 0usize..10 {
+        let tx_res = tx.send(i);
+        assert!(tx_res.is_ok());
+    }
+    let tx_res = tx.send_timeout(11, Duration::from_millis(100));
+    assert!(tx_res.is_err());
+    assert!(tx_res.unwrap_err().is_timeout());
+
+    let th = thread::spawn(move || {
+        assert!(tx.send_timeout(10, Duration::from_millis(100)).is_err());
+        assert!(tx.send_timeout(10, Duration::from_millis(200)).is_ok());
+    });
+
+    tokio::time::sleep(Duration::from_millis(200)).await;
+
+    for i in 0usize..11 {
         match rx.recv().await {
             Ok(j) => {
                 debug!("recv {}", i);

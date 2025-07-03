@@ -35,5 +35,21 @@ flume = {version="0.11", features= ["async"] }
 kanal = {version="0.1"}
 
 [[bench]]
-name = "crossfire_bench"
+name = "crossfire"
+harness = false
+
+[[bench]]
+name = "crossbeam"
+harness = false
+
+[[bench]]
+name = "flume"
+harness = false
+
+[[bench]]
+name = "kanal"
+harness = false
+
+[[bench]]
+name = "tokio"
 harness = false

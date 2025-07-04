@@ -140,7 +140,7 @@ impl<T> AsyncRx<T> {
                 }
                 Some(item) => {
                     if let Some(old_waker) = o_waker.take() {
-                        self.shared.cancel_recv_waker(old_waker);
+                        old_waker.cancel();
                     }
                     self.shared.on_recv();
                     return Ok(item);

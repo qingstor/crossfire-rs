@@ -121,7 +121,7 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
                 }
                 Ok(_) => {
                     if let Some(old_waker) = o_waker.take() {
-                        self.shared.cancel_send_waker(old_waker);
+                        old_waker.cancel();
                     }
                     self.shared.on_send();
                     return Ok(());

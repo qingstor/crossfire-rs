@@ -163,16 +163,6 @@ impl<T> ChannelShared<T> {
         self.senders.fire()
     }
 
-    #[inline(always)]
-    pub fn cancel_recv_waker(&self, waker: LockedWaker) {
-        self.recvs.cancel_waker(waker);
-    }
-
-    #[inline(always)]
-    pub fn cancel_send_waker(&self, waker: LockedWaker) {
-        self.senders.cancel_waker(waker);
-    }
-
     /// On timeout, clear dead wakers on sender queue
     pub fn clear_send_wakers(&self, seq: u64) {
         self.senders.clear_wakers(seq);

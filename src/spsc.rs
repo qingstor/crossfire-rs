@@ -18,7 +18,12 @@ pub fn unbounded_async<T: Unpin>() -> (Tx<T>, AsyncRx<T>) {
 }
 
 /// Initiate a bounded channel that sender and receiver are async
-pub fn bounded_async<T: Unpin>(size: usize) -> (AsyncTx<T>, AsyncRx<T>) {
+///
+/// Special case: 0 size is not supported yet, threat it as 1 size for now.
+pub fn bounded_async<T: Unpin>(mut size: usize) -> (AsyncTx<T>, AsyncRx<T>) {
+    if size == 0 {
+        size = 1;
+    }
     let (tx, rx) = crossbeam::channel::bounded(size);
     let send_wakers = SendWakersSingle::new();
     let recv_wakers = RecvWakersSingle::new();
@@ -30,7 +35,12 @@ pub fn bounded_async<T: Unpin>(size: usize) -> (AsyncTx<T>, AsyncRx<T>) {
 }
 
 /// Initiate a bounded channel that sender is async, receiver is blocking
-pub fn bounded_tx_async_rx_blocking<T: Unpin>(size: usize) -> (AsyncTx<T>, Rx<T>) {
+///
+/// Special case: 0 size is not supported yet, threat it as 1 size for now.
+pub fn bounded_tx_async_rx_blocking<T: Unpin>(mut size: usize) -> (AsyncTx<T>, Rx<T>) {
+    if size == 0 {
+        size = 1;
+    }
     let (tx, rx) = crossbeam::channel::bounded(size);
     let send_wakers = SendWakersSingle::new();
     let recv_wakers = RecvWakersBlocking::new();
@@ -42,7 +52,12 @@ pub fn bounded_tx_async_rx_blocking<T: Unpin>(size: usize) -> (AsyncTx<T>, Rx<T>
 }
 
 /// Initiate a bounded channel that sender is blocking, receiver is sync
-pub fn bounded_tx_blocking_rx_async<T>(size: usize) -> (Tx<T>, AsyncRx<T>) {
+///
+/// Special case: 0 size is not supported yet, threat it as 1 size for now.
+pub fn bounded_tx_blocking_rx_async<T>(mut size: usize) -> (Tx<T>, AsyncRx<T>) {
+    if size == 0 {
+        size = 1;
+    }
     let (tx, rx) = crossbeam::channel::bounded(size);
     let send_wakers = SendWakersBlocking::new();
     let recv_wakers = RecvWakersSingle::new();

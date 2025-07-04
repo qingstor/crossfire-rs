@@ -1,7 +1,21 @@
+use crate::async_rx::*;
+use crate::async_tx::*;
+use crate::blocking_rx::*;
+use crate::blocking_tx::*;
 /// Single producer, single consumer
 use crate::channel::*;
-use crate::rx::*;
-use crate::tx::*;
+
+/// Initiate a unbounded channel.
+/// Sender will never block, so we use the same TxBlocking for threads
+pub fn unbounded_async<T: Unpin>() -> (Tx<T>, AsyncRx<T>) {
+    let (tx, rx) = crossbeam::channel::unbounded();
+    let send_wakers = SendWakersBlocking::new();
+    let recv_wakers = RecvWakersSingle::new();
+    let shared = ChannelShared::new(send_wakers, recv_wakers);
+    let tx = Tx::new(tx, shared.clone());
+    let rx = AsyncRx::new(rx, shared);
+    (tx, rx)
+}
 
 /// Initiate a bounded channel that sender and receiver are async
 pub fn bounded_async<T: Unpin>(size: usize) -> (AsyncTx<T>, AsyncRx<T>) {
@@ -34,18 +48,6 @@ pub fn bounded_tx_blocking_rx_async<T>(size: usize) -> (Tx<T>, AsyncRx<T>) {
     let recv_wakers = RecvWakersSingle::new();
     let shared = ChannelShared::new(send_wakers, recv_wakers);
 
-    let tx = Tx::new(tx, shared.clone());
-    let rx = AsyncRx::new(rx, shared);
-    (tx, rx)
-}
-
-/// Initiate a unbounded channel.
-/// Sender will never block, so we use the same TxBlocking for threads
-pub fn unbounded_async<T: Unpin>() -> (Tx<T>, AsyncRx<T>) {
-    let (tx, rx) = crossbeam::channel::unbounded();
-    let send_wakers = SendWakersBlocking::new();
-    let recv_wakers = RecvWakersSingle::new();
-    let shared = ChannelShared::new(send_wakers, recv_wakers);
     let tx = Tx::new(tx, shared.clone());
     let rx = AsyncRx::new(rx, shared);
     (tx, rx)

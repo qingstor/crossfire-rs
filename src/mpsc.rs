@@ -1,7 +1,9 @@
+use crate::async_rx::*;
+use crate::async_tx::*;
+use crate::blocking_rx::*;
+use crate::blocking_tx::*;
 /// Multi producers, single consumer
 use crate::channel::*;
-use crate::m_tx::*;
-use crate::rx::*;
 
 /// Initiate a unbounded channel.
 ///

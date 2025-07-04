@@ -154,15 +154,16 @@ mod send_wakers;
 /// Single producer, single consumer
 pub mod spsc;
 pub use locked_waker::LockedWaker;
-mod rx;
-pub use rx::*;
-mod m_rx;
-pub use m_rx::*;
+
+mod blocking_tx;
+pub use blocking_tx::*;
+mod blocking_rx;
+pub use blocking_rx::*;
+mod async_tx;
+pub use async_tx::*;
+mod async_rx;
+pub use async_rx::*;
 pub mod stream;
-mod tx;
-pub use tx::*;
-mod m_tx;
-pub use m_tx::*;
 
 #[cfg(test)]
 mod tests;

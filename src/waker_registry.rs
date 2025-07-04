@@ -20,7 +20,7 @@ pub trait RegistryTrait {
 
     fn clear_wakers(&self, _seq: u64);
 
-    fn fire(&self);
+    fn fire(&self) -> bool;
 
     fn close(&self);
 
@@ -53,7 +53,9 @@ impl RegistryTrait for RegistryDummy {
     fn clear_wakers(&self, _seq: u64) {}
 
     #[inline(always)]
-    fn fire(&self) {}
+    fn fire(&self) -> bool {
+        false
+    }
 
     #[inline(always)]
     fn close(&self) {}
@@ -109,8 +111,8 @@ impl RegistryTrait for RegistrySingle {
     }
 
     #[inline(always)]
-    fn fire(&self) {
-        let _ = self.cell.wake();
+    fn fire(&self) -> bool {
+        self.cell.wake()
     }
 
     #[inline(always)]
@@ -190,12 +192,13 @@ impl RegistryTrait for RegistryMulti {
     }
 
     #[inline(always)]
-    fn fire(&self) {
+    fn fire(&self) -> bool {
         while let Some(waker) = self.queue.pop() {
             if waker.wake() {
-                return;
+                return true;
             }
         }
+        false
     }
 
     #[inline(always)]

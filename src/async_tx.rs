@@ -99,15 +99,32 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
         // make sure always take the o_waker out and abandon,
         // to skip the timeout cleaning logic in Drop.
         let backoff = Backoff::new();
-        let try_limit = 3;
+        let shared = &self.shared;
+        let try_limit: usize = 3;
+        macro_rules! stats {
+            ($try: expr, $done: expr) => {
+                #[cfg(feature = "profile")]
+                {
+                    ChannelStats::tx_poll($try);
+                    ChannelStats::tx_done();
+                }
+            };
+            ($try: expr) => {
+                #[cfg(feature = "profile")]
+                {
+                    ChannelStats::tx_poll($try);
+                }
+            };
+        }
         for i in 0..try_limit {
             if i > 0 {
                 backoff.snooze();
             }
-            match self.shared.try_send(item) {
+            match shared.try_send(item) {
                 Err(t) => {
                     if i == try_limit - 2 {
-                        if self.shared.reg_send_async(ctx, o_waker) {
+                        if shared.reg_send_async(ctx, o_waker) {
+                            stats!(i + 1);
                             // waker is not consumed
                             return Err(self._return_full(t));
                         }
@@ -123,11 +140,13 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
                     if let Some(old_waker) = o_waker.take() {
                         old_waker.cancel();
                     }
-                    self.shared.on_send();
+                    stats!(i + 1, true);
+                    shared.on_send();
                     return Ok(());
                 }
             }
         }
+        stats!(try_limit, true);
         return Err(self._return_full(item));
     }
 

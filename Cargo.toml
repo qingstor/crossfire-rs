@@ -21,6 +21,7 @@ crossbeam = "0.8"
 futures = "0.3"
 enum_dispatch = "0.3"
 async-trait = "0"
+lazy_static = "1.4"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["time", "sync", "rt-multi-thread", "rt", "macros"] }
@@ -36,6 +37,7 @@ kanal = {version="0.1"}
 
 [features]
 default = []
+profile = []
 
 [[bench]]
 name = "crossfire"

@@ -218,6 +218,12 @@ fn bench_crossfire_bounded_blocking_1_1(c: &mut Criterion) {
                 _crossfire_blocking(vec![tx], vec![rx], msg_count);
             })
         });
+        #[cfg(feature = "profile")]
+        {
+            println!("stats {}", crossfire::ChannelStats::to_string());
+            crossfire::ChannelStats::clear();
+        }
+
         group.throughput(Throughput::Elements(msg_count as u64));
         group.bench_function(format!("mpsc 1x1 size {}", size).to_string(), |b| {
             b.iter(move || {
@@ -225,6 +231,12 @@ fn bench_crossfire_bounded_blocking_1_1(c: &mut Criterion) {
                 _crossfire_blocking(vec![tx], vec![rx], msg_count);
             })
         });
+        #[cfg(feature = "profile")]
+        {
+            println!("stats {}", crossfire::ChannelStats::to_string());
+            crossfire::ChannelStats::clear();
+        }
+
         group.throughput(Throughput::Elements(msg_count as u64));
         group.bench_function(format!("mpmc 1x1 size {}", size).to_string(), |b| {
             b.iter(move || {
@@ -232,6 +244,11 @@ fn bench_crossfire_bounded_blocking_1_1(c: &mut Criterion) {
                 _crossfire_blocking(vec![tx], vec![rx], msg_count);
             })
         });
+        #[cfg(feature = "profile")]
+        {
+            println!("stats {}", crossfire::ChannelStats::to_string());
+            crossfire::ChannelStats::clear();
+        }
     }
     group.finish();
 }
@@ -248,6 +265,14 @@ fn bench_crossfire_bounded_100_blocking_mpsc(c: &mut Criterion) {
                 _crossfire_blocking(_crossfire_btx_clone(tx, *i), vec![rx], ONE_MILLION);
             })
         });
+    }
+    #[cfg(feature = "profile")]
+    {
+        println!("stats {}", crossfire::ChannelStats::to_string());
+        crossfire::ChannelStats::clear();
+    }
+
+    for tx_count in [1, 2, 4, 8, 16] {
         group.throughput(Throughput::Elements(ONE_MILLION as u64));
         group.bench_with_input(BenchmarkId::new("mpmc", tx_count), &tx_count, |b, i| {
             b.iter(move || {
@@ -256,6 +281,12 @@ fn bench_crossfire_bounded_100_blocking_mpsc(c: &mut Criterion) {
             })
         });
     }
+    #[cfg(feature = "profile")]
+    {
+        println!("stats {}", crossfire::ChannelStats::to_string());
+        crossfire::ChannelStats::clear();
+    }
+
     group.finish();
 }
 
@@ -278,6 +309,12 @@ fn bench_crossfire_bounded_100_blocking_mpmc(c: &mut Criterion) {
             })
         });
     }
+    #[cfg(feature = "profile")]
+    {
+        println!("stats {}", crossfire::ChannelStats::to_string());
+        crossfire::ChannelStats::clear();
+    }
+
     group.finish();
 }
 
@@ -293,6 +330,12 @@ fn bench_crossfire_bounded_async_1_1(c: &mut Criterion) {
                 _crossfire_bounded_async(vec![tx], vec![rx], msg_count).await;
             })
         });
+        #[cfg(feature = "profile")]
+        {
+            println!("stats {}", crossfire::ChannelStats::to_string());
+            crossfire::ChannelStats::clear();
+        }
+
         group.throughput(Throughput::Elements(msg_count as u64));
         group.bench_function(format!("mpsc 1x1 size {}", size).to_string(), |b| {
             b.to_async(get_runtime()).iter(async || {
@@ -300,6 +343,12 @@ fn bench_crossfire_bounded_async_1_1(c: &mut Criterion) {
                 _crossfire_bounded_async(vec![tx], vec![rx], msg_count).await;
             })
         });
+        #[cfg(feature = "profile")]
+        {
+            println!("stats {}", crossfire::ChannelStats::to_string());
+            crossfire::ChannelStats::clear();
+        }
+
         group.throughput(Throughput::Elements(msg_count as u64));
         group.bench_function(format!("mpmc 1x1 size {}", size).to_string(), |b| {
             b.to_async(get_runtime()).iter(async || {
@@ -307,6 +356,11 @@ fn bench_crossfire_bounded_async_1_1(c: &mut Criterion) {
                 _crossfire_bounded_async(vec![tx], vec![rx], msg_count).await;
             })
         });
+        #[cfg(feature = "profile")]
+        {
+            println!("stats {}", crossfire::ChannelStats::to_string());
+            crossfire::ChannelStats::clear();
+        }
     }
     group.finish();
 }
@@ -323,6 +377,13 @@ fn bench_crossfire_bounded_100_async_mpsc(c: &mut Criterion) {
                 _crossfire_bounded_async(_crossfire_atx_clone(tx, *i), vec![rx], ONE_MILLION).await;
             })
         });
+    }
+    #[cfg(feature = "profile")]
+    {
+        println!("stats {}", crossfire::ChannelStats::to_string());
+        crossfire::ChannelStats::clear();
+    }
+    for tx_count in [1, 2, 4, 8, 16] {
         group.throughput(Throughput::Elements(ONE_MILLION as u64));
         group.bench_with_input(BenchmarkId::new("mpmc", tx_count), &tx_count, |b, i| {
             b.to_async(get_runtime()).iter(async || {
@@ -330,6 +391,11 @@ fn bench_crossfire_bounded_100_async_mpsc(c: &mut Criterion) {
                 _crossfire_bounded_async(_crossfire_atx_clone(tx, *i), vec![rx], ONE_MILLION).await;
             })
         });
+    }
+    #[cfg(feature = "profile")]
+    {
+        println!("stats {}", crossfire::ChannelStats::to_string());
+        crossfire::ChannelStats::clear();
     }
     group.finish();
 }
@@ -354,6 +420,12 @@ fn bench_crossfire_bounded_100_async_mpmc(c: &mut Criterion) {
             })
         });
     }
+    #[cfg(feature = "profile")]
+    {
+        println!("stats {}", crossfire::ChannelStats::to_string());
+        crossfire::ChannelStats::clear();
+    }
+
     group.finish();
 }
 
@@ -368,12 +440,23 @@ fn bench_crossfire_unbounded_blocking_1_1(c: &mut Criterion) {
             _crossfire_blocking(vec![tx], vec![rx], ONE_MILLION);
         })
     });
+    #[cfg(feature = "profile")]
+    {
+        println!("stats {}", crossfire::ChannelStats::to_string());
+        crossfire::ChannelStats::clear();
+    }
+
     group.bench_function("mpsc 1x1", |b| {
         b.iter(move || {
             let (tx, rx) = crossfire::mpsc::unbounded_blocking();
             _crossfire_blocking(vec![tx], vec![rx], ONE_MILLION);
         })
     });
+    #[cfg(feature = "profile")]
+    {
+        println!("stats {}", crossfire::ChannelStats::to_string());
+        crossfire::ChannelStats::clear();
+    }
 
     group.bench_function("mpmc 1x1", |b| {
         b.iter(move || {
@@ -381,6 +464,12 @@ fn bench_crossfire_unbounded_blocking_1_1(c: &mut Criterion) {
             _crossfire_blocking(vec![tx], vec![rx], ONE_MILLION);
         })
     });
+    #[cfg(feature = "profile")]
+    {
+        println!("stats {}", crossfire::ChannelStats::to_string());
+        crossfire::ChannelStats::clear();
+    }
+
     group.finish();
 }
 
@@ -399,6 +488,11 @@ fn bench_crossfire_unbounded_blocking_mpsc(c: &mut Criterion) {
             })
         });
     }
+    #[cfg(feature = "profile")]
+    {
+        println!("stats {}", crossfire::ChannelStats::to_string());
+        crossfire::ChannelStats::clear();
+    }
     for input in [1, 2, 4, 8, 16] {
         let param = Concurrency { tx_count: input, rx_count: 1 };
         group.throughput(Throughput::Elements(ONE_MILLION as u64));
@@ -408,6 +502,11 @@ fn bench_crossfire_unbounded_blocking_mpsc(c: &mut Criterion) {
                 _crossfire_blocking(_crossfire_btx_clone(tx, i.tx_count), vec![rx], ONE_MILLION);
             })
         });
+    }
+    #[cfg(feature = "profile")]
+    {
+        println!("stats {}", crossfire::ChannelStats::to_string());
+        crossfire::ChannelStats::clear();
     }
     group.finish();
 }
@@ -430,6 +529,11 @@ fn bench_crossfire_unbounded_blocking_mpmc(c: &mut Criterion) {
             })
         });
     }
+    #[cfg(feature = "profile")]
+    {
+        println!("stats {}", crossfire::ChannelStats::to_string());
+        crossfire::ChannelStats::clear();
+    }
     group.finish();
 }
 
@@ -444,19 +548,33 @@ fn bench_crossfire_unbounded_async_1_1(c: &mut Criterion) {
             _crossfire_blocking_async(vec![tx], vec![rx], ONE_MILLION).await;
         })
     });
+    #[cfg(feature = "profile")]
+    {
+        println!("stats {}", crossfire::ChannelStats::to_string());
+        crossfire::ChannelStats::clear();
+    }
     group.bench_function("mpsc 1x1", |b| {
         b.to_async(get_runtime()).iter(async || {
             let (tx, rx) = crossfire::mpsc::unbounded_async();
             _crossfire_blocking_async(vec![tx], vec![rx], ONE_MILLION).await;
         })
     });
-
+    #[cfg(feature = "profile")]
+    {
+        println!("stats {}", crossfire::ChannelStats::to_string());
+        crossfire::ChannelStats::clear();
+    }
     group.bench_function("mpmc 1x1", |b| {
         b.to_async(get_runtime()).iter(async || {
             let (tx, rx) = crossfire::mpmc::unbounded_async();
             _crossfire_blocking_async(vec![tx], vec![rx], ONE_MILLION).await;
         })
     });
+    #[cfg(feature = "profile")]
+    {
+        println!("stats {}", crossfire::ChannelStats::to_string());
+        crossfire::ChannelStats::clear();
+    }
     group.finish();
 }
 
@@ -480,6 +598,11 @@ fn bench_crossfire_unbounded_async_mpsc(c: &mut Criterion) {
             })
         });
     }
+    #[cfg(feature = "profile")]
+    {
+        println!("stats {}", crossfire::ChannelStats::to_string());
+        crossfire::ChannelStats::clear();
+    }
     for input in [1, 2, 4, 8, 16] {
         let param = Concurrency { tx_count: input, rx_count: 1 };
         group.throughput(Throughput::Elements(ONE_MILLION as u64));
@@ -494,6 +617,11 @@ fn bench_crossfire_unbounded_async_mpsc(c: &mut Criterion) {
                 .await;
             })
         });
+    }
+    #[cfg(feature = "profile")]
+    {
+        println!("stats {}", crossfire::ChannelStats::to_string());
+        crossfire::ChannelStats::clear();
     }
     group.finish();
 }
@@ -516,6 +644,11 @@ fn bench_crossfire_unbounded_async_mpmc(c: &mut Criterion) {
                 .await;
             })
         });
+    }
+    #[cfg(feature = "profile")]
+    {
+        println!("stats {}", crossfire::ChannelStats::to_string());
+        crossfire::ChannelStats::clear();
     }
     group.finish();
 }

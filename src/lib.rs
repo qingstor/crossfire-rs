@@ -148,6 +148,9 @@ mod locked_waker;
 mod waker_registry;
 pub use locked_waker::LockedWaker;
 
+#[cfg(feature = "profile")]
+pub use channel::ChannelStats;
+
 /// collections that can be re-used
 pub mod collections;
 

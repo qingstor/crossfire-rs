@@ -1,5 +1,4 @@
 use crate::channel::*;
-use crossbeam::channel::Receiver;
 pub use crossbeam::channel::{RecvError, RecvTimeoutError, TryRecvError};
 use std::fmt;
 use std::ops::{Deref, DerefMut};
@@ -8,8 +7,7 @@ use std::time::Duration;
 
 /// Receiver that works in blocking context
 pub struct Rx<T> {
-    pub(crate) recv: Receiver<T>,
-    pub(crate) shared: Arc<ChannelShared>,
+    pub(crate) shared: Arc<ChannelShared<T>>,
 }
 
 impl<T> fmt::Debug for Rx<T> {
@@ -25,9 +23,38 @@ impl<T> Drop for Rx<T> {
 }
 
 impl<T> Rx<T> {
-    #[inline]
-    pub(crate) fn new(recv: Receiver<T>, shared: Arc<ChannelShared>) -> Self {
-        Self { recv, shared }
+    #[inline(always)]
+    pub(crate) fn new(shared: Arc<ChannelShared<T>>) -> Self {
+        Self { shared }
+    }
+
+    #[inline(always)]
+    pub(crate) fn _try_recv(shared: &ChannelShared<T>) -> Option<T> {
+        if let Some(item) = shared.try_recv() {
+            shared.on_recv();
+            return Some(item);
+        }
+        None
+    }
+
+    #[inline(always)]
+    pub(crate) fn _recv_blocking(shared: &ChannelShared<T>) -> Result<T, RecvError> {
+        let waker = LockedWaker::new_blocking();
+        let mut init = true;
+        loop {
+            if let Some(item) = Self::_try_recv(shared) {
+                return Ok(item);
+            }
+            if shared.get_tx_count() == 0 {
+                return Err(RecvError);
+            }
+            if waker.is_waked() || init {
+                init = false;
+                shared.reg_recv_blocking(&waker);
+            } else {
+                std::thread::park();
+            }
+        }
     }
 
     /// Receive message, will block when channel is empty.
@@ -37,13 +64,7 @@ impl<T> Rx<T> {
     /// Returns Err([RecvError]) when all Tx dropped.
     #[inline]
     pub fn recv<'a>(&'a self) -> Result<T, RecvError> {
-        match self.recv.recv() {
-            Err(e) => return Err(e),
-            Ok(i) => {
-                self.shared.on_recv();
-                return Ok(i);
-            }
-        }
+        Self::_recv_blocking(&self.shared)
     }
 
     /// Try to receive message, non-blocking.
@@ -55,11 +76,16 @@ impl<T> Rx<T> {
     /// returns Err([TryRecvError::Disconnected]) when all Tx dropped.
     #[inline]
     pub fn try_recv(&self) -> Result<T, TryRecvError> {
-        match self.recv.try_recv() {
-            Err(e) => return Err(e),
-            Ok(i) => {
+        if self.shared.get_tx_count() == 0 {
+            return Err(TryRecvError::Disconnected);
+        }
+        match self.shared.try_recv() {
+            Some(i) => {
                 self.shared.on_recv();
                 return Ok(i);
+            }
+            None => {
+                return Err(TryRecvError::Empty);
             }
         }
     }
@@ -74,25 +100,26 @@ impl<T> Rx<T> {
     /// returns Err([RecvTimeoutError::Disconnected]) when all Tx dropped.
     #[inline]
     pub fn recv_timeout(&self, timeout: Duration) -> Result<T, RecvTimeoutError> {
-        match self.recv.recv_timeout(timeout) {
-            Err(e) => return Err(e),
-            Ok(i) => {
-                self.shared.on_recv();
-                return Ok(i);
-            }
-        }
+        todo!();
+        //        match self.recv.recv_timeout(timeout) {
+        //            Err(e) => return Err(e),
+        //            Ok(i) => {
+        //                self.shared.on_recv();
+        //                return Ok(i);
+        //            }
+        //        }
     }
 
     /// Probe possible messages in the channel (not accurate)
-    #[inline]
+    #[inline(always)]
     pub fn len(&self) -> usize {
-        self.recv.len()
+        self.shared.len()
     }
 
     /// Whether there's message in the channel (not accurate)
-    #[inline]
+    #[inline(always)]
     pub fn is_empty(&self) -> bool {
-        self.recv.is_empty()
+        self.shared.is_empty()
     }
 }
 
@@ -102,18 +129,18 @@ impl<T> Rx<T> {
 pub struct MRx<T>(pub(crate) Rx<T>);
 
 impl<T> MRx<T> {
-    #[inline]
-    pub(crate) fn new(recv: Receiver<T>, shared: Arc<ChannelShared>) -> Self {
-        Self(Rx::new(recv, shared))
+    #[inline(always)]
+    pub(crate) fn new(shared: Arc<ChannelShared<T>>) -> Self {
+        Self(Rx::new(shared))
     }
 }
 
 impl<T> Clone for MRx<T> {
-    #[inline]
+    #[inline(always)]
     fn clone(&self) -> Self {
         let inner = &self.0;
         inner.shared.add_rx();
-        Self(Rx { recv: inner.recv.clone(), shared: inner.shared.clone() })
+        Self(Rx { shared: inner.shared.clone() })
     }
 }
 

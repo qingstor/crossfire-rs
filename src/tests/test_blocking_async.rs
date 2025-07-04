@@ -128,7 +128,6 @@ async fn test_pressure_1_tx_blocking_1_rx_async<
     for i in 0..round {
         match rx.recv().await {
             Ok(msg) => {
-                //debug!("recv {}", msg);
                 assert_eq!(msg, i);
             }
             Err(_e) => {

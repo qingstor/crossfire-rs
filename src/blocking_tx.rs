@@ -1,5 +1,4 @@
 use crate::channel::*;
-use crossbeam::channel::Sender;
 pub use crossbeam::channel::{SendError, SendTimeoutError, TrySendError};
 use std::fmt;
 use std::ops::{Deref, DerefMut};
@@ -8,8 +7,7 @@ use std::time::Duration;
 
 /// Sender that works in blocking context
 pub struct Tx<T> {
-    pub(crate) sender: Sender<T>,
-    pub(crate) shared: Arc<ChannelShared>,
+    pub(crate) shared: Arc<ChannelShared<T>>,
 }
 
 impl<T> fmt::Debug for Tx<T> {
@@ -24,10 +22,52 @@ impl<T> Drop for Tx<T> {
     }
 }
 
-impl<T> Tx<T> {
-    #[inline]
-    pub(crate) fn new(sender: Sender<T>, shared: Arc<ChannelShared>) -> Self {
-        Self { sender, shared }
+impl<T: Send + 'static> Tx<T> {
+    #[inline(always)]
+    fn _try_send(shared: &ChannelShared<T>, item: T) -> Result<(), T> {
+        match shared.try_send(item) {
+            Err(item) => {
+                return Err(item);
+            }
+            Ok(_) => {
+                shared.on_send();
+                return Ok(());
+            }
+        }
+    }
+
+    #[inline(always)]
+    pub(crate) fn _send_blocking(
+        shared: &ChannelShared<T>, mut item: T,
+    ) -> Result<(), SendError<T>> {
+        if shared.get_rx_count() == 0 {
+            return Err(SendError(item));
+        }
+        if shared.bound_size == 0 {
+            match Self::_try_send(shared, item) {
+                Ok(_) => return Ok(()),
+                Err(t) => return Err(SendError(t)),
+            }
+        } else {
+            let waker = LockedWaker::new_blocking();
+            let mut init = true;
+            loop {
+                if let Err(t) = Self::_try_send(shared, item) {
+                    if shared.get_rx_count() == 0 {
+                        return Err(SendError(t));
+                    }
+                    item = t;
+                    if waker.is_waked() || init {
+                        init = false;
+                        shared.reg_send_blocking(&waker);
+                    } else {
+                        std::thread::park();
+                    }
+                } else {
+                    return Ok(());
+                }
+            }
+        }
     }
 
     /// Send message. Will block when channel is full.
@@ -38,13 +78,7 @@ impl<T> Tx<T> {
     ///
     #[inline]
     pub fn send(&self, item: T) -> Result<(), SendError<T>> {
-        match self.sender.send(item) {
-            Err(e) => return Err(e),
-            Ok(_) => {
-                self.shared.on_send();
-                return Ok(());
-            }
-        }
+        Self::_send_blocking(&self.shared, item)
     }
 
     /// Try to send message, non-blocking
@@ -56,13 +90,21 @@ impl<T> Tx<T> {
     /// Returns Err([TrySendError::Disconnected]) when all Rx dropped.
     #[inline]
     pub fn try_send(&self, item: T) -> Result<(), TrySendError<T>> {
-        match self.sender.try_send(item) {
-            Err(e) => return Err(e),
-            Ok(_) => {
-                self.shared.on_send();
-                return Ok(());
+        if let Err(t) = Self::_try_send(&self.shared, item) {
+            if self.shared.get_rx_count() == 0 {
+                return Err(TrySendError::Disconnected(t));
             }
+            return Err(TrySendError::Full(t));
+        } else {
+            Ok(())
         }
+    }
+}
+
+impl<T> Tx<T> {
+    #[inline]
+    pub(crate) fn new(shared: Arc<ChannelShared<T>>) -> Self {
+        Self { shared }
     }
 
     /// Waits for a message to be sent into the channel, but only for a limited time.
@@ -75,25 +117,26 @@ impl<T> Tx<T> {
     /// Returns Err([SendTimeoutError::Disconnected]) when all Rx dropped.
     #[inline]
     pub fn send_timeout(&self, item: T, timeout: Duration) -> Result<(), SendTimeoutError<T>> {
-        match self.sender.send_timeout(item, timeout) {
-            Err(e) => return Err(e),
-            Ok(_) => {
-                self.shared.on_recv();
-                return Ok(());
-            }
-        }
+        todo!();
+        //        match self.sender.send_timeout(item, timeout) {
+        //            Err(e) => return Err(e),
+        //            Ok(_) => {
+        //                self.shared.on_recv();
+        //                return Ok(());
+        //            }
+        //        }
     }
 
     /// Probe possible messages in the channel (not accurate)
     #[inline]
     pub fn len(&self) -> usize {
-        self.sender.len()
+        self.shared.len()
     }
 
     /// Whether there's message in the channel (not accurate)
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.sender.is_empty()
+        self.shared.is_empty()
     }
 }
 
@@ -104,8 +147,8 @@ pub struct MTx<T>(pub(crate) Tx<T>);
 
 impl<T> MTx<T> {
     #[inline]
-    pub(crate) fn new(send: Sender<T>, shared: Arc<ChannelShared>) -> Self {
-        Self(Tx::new(send, shared))
+    pub(crate) fn new(shared: Arc<ChannelShared<T>>) -> Self {
+        Self(Tx::new(shared))
     }
 }
 
@@ -114,7 +157,7 @@ impl<T: Unpin> Clone for MTx<T> {
     fn clone(&self) -> Self {
         let inner = &self.0;
         inner.shared.add_tx();
-        Self(Tx::new(inner.sender.clone(), inner.shared.clone()))
+        Self(Tx::new(inner.shared.clone()))
     }
 }
 

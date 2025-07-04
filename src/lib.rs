@@ -145,15 +145,15 @@ extern crate enum_dispatch;
 
 mod channel;
 mod locked_waker;
+mod waker_registry;
+pub use locked_waker::LockedWaker;
+
 /// Multi producers, single consumer
 pub mod mpmc;
 /// Multi producers, multi consumers
 pub mod mpsc;
-mod recv_wakers;
-mod send_wakers;
 /// Single producer, single consumer
 pub mod spsc;
-pub use locked_waker::LockedWaker;
 
 mod blocking_tx;
 pub use blocking_tx::*;
@@ -163,6 +163,7 @@ mod async_tx;
 pub use async_tx::*;
 mod async_rx;
 pub use async_rx::*;
+
 pub mod stream;
 
 #[cfg(test)]

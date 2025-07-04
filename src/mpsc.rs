@@ -5,7 +5,20 @@ use crate::blocking_tx::*;
 /// Multi producers, single consumer
 use crate::channel::*;
 
-/// Initiate a unbounded channel.
+/// Initiate an unbounded channel for blocking context.
+///
+/// Sender will never block, so we use the same TxBlocking for threads
+pub fn unbounded_blocking<T: Unpin>() -> (MTx<T>, Rx<T>) {
+    let (tx, rx) = crossbeam::channel::unbounded();
+    let send_wakers = SendWakersBlocking::new();
+    let recv_wakers = RecvWakersBlocking::new();
+    let shared = ChannelShared::new(send_wakers, recv_wakers);
+    let tx = MTx::new(tx, shared.clone());
+    let rx = Rx::new(rx, shared);
+    (tx, rx)
+}
+
+/// Initiate an unbounded channel for async context.
 ///
 /// Although sender type is MTx, will never block.
 pub fn unbounded_async<T: Unpin>() -> (MTx<T>, AsyncRx<T>) {
@@ -15,6 +28,23 @@ pub fn unbounded_async<T: Unpin>() -> (MTx<T>, AsyncRx<T>) {
     let shared = ChannelShared::new(send_wakers, recv_wakers);
     let tx = MTx::new(tx, shared.clone());
     let rx = AsyncRx::new(rx, shared);
+    (tx, rx)
+}
+
+/// Initiate a bounded channel for blocking context
+///
+/// Special case: 0 size is not supported yet, threat it as 1 size for now.
+pub fn bounded_blocking<T: Unpin>(mut size: usize) -> (MTx<T>, Rx<T>) {
+    if size == 0 {
+        size = 1;
+    }
+    let (tx, rx) = crossbeam::channel::bounded(size);
+    let send_wakers = SendWakersBlocking::new();
+    let recv_wakers = RecvWakersBlocking::new();
+    let shared = ChannelShared::new(send_wakers, recv_wakers);
+
+    let tx = MTx::new(tx, shared.clone());
+    let rx = Rx::new(rx, shared);
     (tx, rx)
 }
 

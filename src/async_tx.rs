@@ -2,6 +2,7 @@ use crate::blocking_tx::Tx;
 use crate::channel::*;
 use async_trait::async_trait;
 pub use crossbeam::channel::{SendError, TrySendError};
+use crossbeam::utils::Backoff;
 use std::fmt;
 use std::future::Future;
 use std::ops::{Deref, DerefMut};
@@ -40,13 +41,10 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
     /// Returns Err([SendError]) when all Rx is dropped.
     #[inline(always)]
     pub async fn send(&self, item: T) -> Result<(), SendError<T>> {
-        match self.try_send(item) {
-            Ok(()) => return Ok(()),
-            Err(TrySendError::Full(t)) => {
-                return SendFuture { tx: &self, item: Some(t), waker: None }.await;
-            }
-            Err(TrySendError::Disconnected(t)) => return Err(SendError(t)),
+        if self.shared.get_rx_count() == 0 {
+            return Err(SendError(item));
         }
+        return SendFuture { tx: &self, item: Some(item), waker: None }.await;
     }
 
     /// Try to send message, non-blocking
@@ -100,10 +98,15 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
         // When the result is not TrySendError::Full,
         // make sure always take the o_waker out and abandon,
         // to skip the timeout cleaning logic in Drop.
-        for i in 0..2 {
+        let backoff = Backoff::new();
+        let try_limit = 3;
+        for i in 0..try_limit {
+            if i > 0 {
+                backoff.snooze();
+            }
             match self.shared.try_send(item) {
                 Err(t) => {
-                    if i == 0 {
+                    if i == try_limit - 2 {
                         if self.shared.reg_send_async(ctx, o_waker) {
                             // waker is not consumed
                             return Err(self._return_full(t));

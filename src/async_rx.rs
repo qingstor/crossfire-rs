@@ -3,6 +3,7 @@ use crate::channel::*;
 use crate::stream::AsyncStream;
 use async_trait::async_trait;
 pub use crossbeam::channel::{RecvError, TryRecvError};
+use crossbeam::utils::Backoff;
 use std::fmt;
 use std::future::Future;
 use std::ops::{Deref, DerefMut};
@@ -54,15 +55,7 @@ impl<T> AsyncRx<T> {
     /// returns Err([RecvError]) when all Tx dropped.
     #[inline(always)]
     pub async fn recv(&self) -> Result<T, RecvError> {
-        match self.try_recv() {
-            Err(TryRecvError::Disconnected) => {
-                return Err(RecvError {});
-            }
-            Ok(item) => return Ok(item),
-            _ => {
-                return ReceiveFuture { rx: &self, waker: None }.await;
-            }
-        }
+        return ReceiveFuture { rx: &self, waker: None }.await;
     }
 
     /// Try to receive message, non-blocking.
@@ -125,10 +118,15 @@ impl<T> AsyncRx<T> {
         // When the result is not TryRecvError::Empty,
         // make sure always take the o_waker out and abandon,
         // to skip the timeout cleaning logic in Drop.
-        for i in 0..2 {
+        let backoff = Backoff::new();
+        let try_limit = 3;
+        for i in 0..try_limit {
+            if i > 0 {
+                backoff.snooze();
+            }
             match self.shared.try_recv() {
                 None => {
-                    if i == 0 {
+                    if i == try_limit - 2 {
                         if self.shared.reg_recv_async(ctx, o_waker) {
                             // waker is not consumed
                             return Err(self._return_empty());

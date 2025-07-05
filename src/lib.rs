@@ -171,6 +171,7 @@ mod async_rx;
 pub use async_rx::*;
 
 pub mod stream;
+mod thirdparty;
 
 #[cfg(test)]
 mod tests;

@@ -301,3 +301,37 @@ impl ChannelStats {
         STATS.rx_done.fetch_add(1, Ordering::SeqCst);
     }
 }
+
+#[macro_export(local_inner_macros)]
+macro_rules! rx_stats {
+    ($try: expr, $done: expr) => {
+        #[cfg(feature = "profile")]
+        {
+            ChannelStats::rx_poll($try);
+            ChannelStats::rx_done();
+        }
+    };
+    ($try: expr) => {
+        #[cfg(feature = "profile")]
+        {
+            ChannelStats::rx_poll($try);
+        }
+    };
+}
+
+#[macro_export(local_inner_macros)]
+macro_rules! tx_stats {
+    ($try: expr, $done: expr) => {
+        #[cfg(feature = "profile")]
+        {
+            ChannelStats::tx_poll($try);
+            ChannelStats::tx_done();
+        }
+    };
+    ($try: expr) => {
+        #[cfg(feature = "profile")]
+        {
+            ChannelStats::tx_poll($try);
+        }
+    };
+}

@@ -1,4 +1,4 @@
-use crate::channel::*;
+use crate::{channel::*, tx_stats};
 use crossbeam_utils::Backoff;
 use std::fmt;
 use std::mem::MaybeUninit;
@@ -53,10 +53,16 @@ impl<T: Send + 'static> Tx<T> {
                 debug_assert!(waker.is_waked());
                 let _item = MaybeUninit::new(item);
                 loop {
+                    let mut _try_times = 0;
                     let backoff = Backoff::new();
                     loop {
+                        #[cfg(feature = "profile")]
+                        {
+                            _try_times += 1;
+                        }
                         if shared.try_send(&_item).is_ok() {
                             shared.on_send();
+                            tx_stats!(_try_times, true);
                             return Ok(());
                         }
                         if backoff.is_completed() {
@@ -69,6 +75,7 @@ impl<T: Send + 'static> Tx<T> {
                             _item.assume_init_read()
                         }));
                     }
+                    tx_stats!(_try_times);
                     if waker.is_waked() {
                         shared.reg_send_blocking(&waker);
                         if !shared.is_full() {

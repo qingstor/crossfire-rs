@@ -1,4 +1,4 @@
-use crate::channel::*;
+use crate::{channel::*, rx_stats};
 use crossbeam_utils::Backoff;
 use std::fmt;
 use std::ops::{Deref, DerefMut};
@@ -38,10 +38,16 @@ impl<T> Rx<T> {
             let waker = LockedWaker::new_blocking();
             debug_assert!(waker.is_waked());
             loop {
+                let mut _try_times = 0;
                 let backoff = Backoff::new();
                 loop {
+                    #[cfg(feature = "profile")]
+                    {
+                        _try_times += 1;
+                    }
                     if let Some(item) = shared.try_recv() {
                         shared.on_recv();
+                        rx_stats!(_try_times, true);
                         return Ok(item);
                     }
                     if backoff.is_completed() {
@@ -52,6 +58,7 @@ impl<T> Rx<T> {
                 if shared.get_tx_count() == 0 {
                     return Err(RecvTimeoutError::Disconnected);
                 }
+                rx_stats!(_try_times);
                 if waker.is_waked() {
                     shared.reg_recv_blocking(&waker);
                     if !shared.is_empty() {

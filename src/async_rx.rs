@@ -1,6 +1,6 @@
 use crate::blocking_rx::Rx;
-use crate::channel::*;
 use crate::stream::AsyncStream;
+use crate::{channel::*, rx_stats};
 use async_trait::async_trait;
 use crossbeam_utils::Backoff;
 use std::fmt;
@@ -115,21 +115,6 @@ impl<T> AsyncRx<T> {
         &self, ctx: &mut Context, o_waker: &mut Option<LockedWaker>,
     ) -> Result<T, TryRecvError> {
         let shared = &self.shared;
-        macro_rules! stats {
-            ($try: expr, $done: expr) => {
-                #[cfg(feature = "profile")]
-                {
-                    ChannelStats::rx_poll($try);
-                    ChannelStats::rx_done();
-                }
-            };
-            ($try: expr) => {
-                #[cfg(feature = "profile")]
-                {
-                    ChannelStats::rx_poll($try);
-                }
-            };
-        }
         // When the result is not TryRecvError::Empty,
         // make sure always take the o_waker out and abandon,
         // to skip the timeout cleaning logic in Drop.
@@ -143,7 +128,7 @@ impl<T> AsyncRx<T> {
                 None => {
                     if i == try_limit - 2 {
                         if shared.reg_recv_async(ctx, o_waker) {
-                            stats!(i + 1);
+                            rx_stats!(i + 1);
                             // waker is not consumed
                             return Err(self._return_empty());
                         }
@@ -158,13 +143,13 @@ impl<T> AsyncRx<T> {
                     if let Some(old_waker) = o_waker.take() {
                         old_waker.cancel();
                     }
-                    stats!(i + 1, true);
+                    rx_stats!(i + 1, true);
                     shared.on_recv();
                     return Ok(item);
                 }
             }
         }
-        stats!(try_limit, true);
+        rx_stats!(try_limit, true);
         return Err(self._return_empty());
     }
 

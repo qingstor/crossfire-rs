@@ -1,5 +1,5 @@
 use crate::blocking_tx::Tx;
-use crate::channel::*;
+use crate::{channel::*, tx_stats};
 use async_trait::async_trait;
 use crossbeam_utils::Backoff;
 use std::fmt;
@@ -102,21 +102,6 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
         let backoff = Backoff::new();
         let shared = &self.shared;
         let try_limit: usize = 3;
-        macro_rules! stats {
-            ($try: expr, $done: expr) => {
-                #[cfg(feature = "profile")]
-                {
-                    ChannelStats::tx_poll($try);
-                    ChannelStats::tx_done();
-                }
-            };
-            ($try: expr) => {
-                #[cfg(feature = "profile")]
-                {
-                    ChannelStats::tx_poll($try);
-                }
-            };
-        }
         for i in 0..try_limit {
             if i > 0 {
                 backoff.snooze();
@@ -125,7 +110,7 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
                 Err(()) => {
                     if i == try_limit - 2 {
                         if shared.reg_send_async(ctx, o_waker) {
-                            stats!(i + 1);
+                            tx_stats!(i + 1);
                             // waker is not consumed
                             return self._check_disconnect();
                         }
@@ -140,13 +125,13 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
                     if let Some(old_waker) = o_waker.take() {
                         old_waker.cancel();
                     }
-                    stats!(i + 1, true);
+                    tx_stats!(i + 1, true);
                     shared.on_send();
                     return Poll::Ready(Ok(()));
                 }
             }
         }
-        stats!(try_limit, true);
+        tx_stats!(try_limit, true);
         return self._check_disconnect();
     }
 

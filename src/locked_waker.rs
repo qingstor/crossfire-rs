@@ -21,12 +21,6 @@ struct LockedWakerInner {
     seq: u64,
 }
 
-impl Clone for LockedWaker {
-    fn clone(&self) -> Self {
-        Self(self.0.clone())
-    }
-}
-
 pub struct LockedWakerRef {
     w: Weak<LockedWakerInner>,
 }

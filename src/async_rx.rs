@@ -191,7 +191,10 @@ impl<T> AsyncRx<T> {
     /// **NOTE: Do not use it in async context otherwise will block the runtime.**
     #[inline(always)]
     pub fn recv_blocking(&self) -> Result<T, RecvError> {
-        Rx::_recv_blocking(&self.shared)
+        Rx::_recv_blocking(&self.shared, None).map_err(|err| match err {
+            RecvTimeoutError::Disconnected => RecvError,
+            RecvTimeoutError::Timeout => unreachable!(),
+        })
     }
 }
 

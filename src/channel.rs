@@ -8,6 +8,7 @@ use std::mem;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::task::Context;
+use std::time::Instant;
 
 pub enum Channel<T> {
     List(SegQueue<T>),
@@ -26,10 +27,10 @@ impl<T> Channel<T> {
     }
 
     #[inline(always)]
-    pub fn get_bound(&self) -> usize {
+    pub fn get_bound(&self) -> Option<usize> {
         match self {
-            Self::List(_) => 0,
-            Self::Array(s) => s.capacity(),
+            Self::List(_) => None,
+            Self::Array(s) => Some(s.capacity()),
         }
     }
 
@@ -48,6 +49,14 @@ impl<T> Channel<T> {
             Self::Array(s) => s.is_empty(),
         }
     }
+
+    #[inline(always)]
+    pub fn is_full(&self) -> bool {
+        match self {
+            Self::Array(s) => s.is_full(),
+            Self::List(_) => false,
+        }
+    }
 }
 
 pub struct ChannelShared<T> {
@@ -56,7 +65,7 @@ pub struct ChannelShared<T> {
     tx_count: AtomicU64,
     rx_count: AtomicU64,
     inner: Channel<T>,
-    pub bound_size: usize,
+    pub bound_size: Option<usize>,
 }
 
 impl<T: Send + 'static> ChannelShared<T> {
@@ -196,6 +205,29 @@ impl<T> ChannelShared<T> {
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
         self.inner.is_empty()
+    }
+
+    #[inline(always)]
+    pub fn is_full(&self) -> bool {
+        self.inner.is_full()
+    }
+}
+
+/// If timed out, returns false
+#[inline]
+pub fn wait_timeout(deadline: Option<Instant>) -> bool {
+    if let Some(end) = deadline {
+        let now = Instant::now();
+        if now < end {
+            let dur = end - now;
+            std::thread::park_timeout(dur);
+            true
+        } else {
+            false
+        }
+    } else {
+        std::thread::park();
+        true
     }
 }
 

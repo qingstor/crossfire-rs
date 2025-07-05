@@ -1,9 +1,10 @@
 use crate::channel::*;
+use crossbeam_utils::Backoff;
 use std::fmt;
 use std::mem::MaybeUninit;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// Sender that works in blocking context
 pub struct Tx<T> {
@@ -38,34 +39,52 @@ impl<T: Send + 'static> Tx<T> {
     }
 
     #[inline(always)]
-    pub(crate) fn _send_blocking(shared: &ChannelShared<T>, item: T) -> Result<(), SendError<T>> {
+    pub(crate) fn _send_blocking(
+        shared: &ChannelShared<T>, item: T, deadline: Option<Instant>,
+    ) -> Result<(), SendTimeoutError<T>> {
         if shared.get_rx_count() == 0 {
-            return Err(SendError(item));
+            return Err(SendTimeoutError::Disconnected(item));
         }
-        if shared.bound_size == 0 {
-            match Self::_try_send(shared, item) {
-                Ok(_) => return Ok(()),
-                Err(t) => return Err(SendError(t)),
+        if let Some(bound_size) = shared.bound_size {
+            if bound_size == 0 {
+                todo!();
+            } else {
+                let waker = LockedWaker::new_blocking();
+                debug_assert!(waker.is_waked());
+                let _item = MaybeUninit::new(item);
+                loop {
+                    let backoff = Backoff::new();
+                    loop {
+                        if shared.try_send(&_item).is_ok() {
+                            shared.on_send();
+                            return Ok(());
+                        }
+                        if backoff.is_completed() {
+                            break;
+                        }
+                        backoff.snooze();
+                    }
+                    if shared.get_rx_count() == 0 {
+                        return Err(SendTimeoutError::Disconnected(unsafe {
+                            _item.assume_init_read()
+                        }));
+                    }
+                    if waker.is_waked() {
+                        shared.reg_send_blocking(&waker);
+                        if !shared.is_full() {
+                            continue;
+                        }
+                    }
+                    if !wait_timeout(deadline) {
+                        return Err(SendTimeoutError::Timeout(unsafe { _item.assume_init_read() }));
+                    }
+                }
             }
         } else {
-            let waker = LockedWaker::new_blocking();
-            let mut init = true;
-            let _item = MaybeUninit::new(item);
-            loop {
-                if let Err(()) = shared.try_send(&_item) {
-                    if waker.is_waked() || init {
-                        init = false;
-                        shared.reg_send_blocking(&waker);
-                    } else {
-                        if shared.get_rx_count() == 0 {
-                            return Err(SendError(unsafe { _item.assume_init_read() }));
-                        }
-                        std::thread::park();
-                    }
-                } else {
-                    shared.on_send();
-                    return Ok(());
-                }
+            // unbounded
+            match Self::_try_send(shared, item) {
+                Ok(_) => return Ok(()),
+                Err(_) => unreachable!(),
             }
         }
     }
@@ -78,7 +97,10 @@ impl<T: Send + 'static> Tx<T> {
     ///
     #[inline]
     pub fn send(&self, item: T) -> Result<(), SendError<T>> {
-        Self::_send_blocking(&self.shared, item)
+        Self::_send_blocking(&self.shared, item, None).map_err(|err| match err {
+            SendTimeoutError::Disconnected(msg) => SendError(msg),
+            SendTimeoutError::Timeout(_) => unreachable!(),
+        })
     }
 
     /// Try to send message, non-blocking
@@ -90,6 +112,9 @@ impl<T: Send + 'static> Tx<T> {
     /// Returns Err([TrySendError::Disconnected]) when all Rx dropped.
     #[inline]
     pub fn try_send(&self, item: T) -> Result<(), TrySendError<T>> {
+        if self.shared.bound_size == Some(0) {
+            todo!();
+        }
         if let Err(t) = Self::_try_send(&self.shared, item) {
             if self.shared.get_rx_count() == 0 {
                 return Err(TrySendError::Disconnected(t));
@@ -98,13 +123,6 @@ impl<T: Send + 'static> Tx<T> {
         } else {
             Ok(())
         }
-    }
-}
-
-impl<T> Tx<T> {
-    #[inline]
-    pub(crate) fn new(shared: Arc<ChannelShared<T>>) -> Self {
-        Self { shared }
     }
 
     /// Waits for a message to be sent into the channel, but only for a limited time.
@@ -117,14 +135,20 @@ impl<T> Tx<T> {
     /// Returns Err([SendTimeoutError::Disconnected]) when all Rx dropped.
     #[inline]
     pub fn send_timeout(&self, item: T, timeout: Duration) -> Result<(), SendTimeoutError<T>> {
-        todo!();
-        //        match self.sender.send_timeout(item, timeout) {
-        //            Err(e) => return Err(e),
-        //            Ok(_) => {
-        //                self.shared.on_recv();
-        //                return Ok(());
-        //            }
-        //        }
+        match Instant::now().checked_add(timeout) {
+            Some(deadline) => Self::_send_blocking(&self.shared, item, Some(deadline)),
+            None => self.try_send(item).map_err(|e| match e {
+                TrySendError::Disconnected(t) => SendTimeoutError::Disconnected(t),
+                TrySendError::Full(t) => SendTimeoutError::Timeout(t),
+            }),
+        }
+    }
+}
+
+impl<T> Tx<T> {
+    #[inline]
+    pub(crate) fn new(shared: Arc<ChannelShared<T>>) -> Self {
+        Self { shared }
     }
 
     /// Probe possible messages in the channel (not accurate)

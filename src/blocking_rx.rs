@@ -1,8 +1,9 @@
 use crate::channel::*;
+use crossbeam_utils::Backoff;
 use std::fmt;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// Receiver that works in blocking context
 pub struct Rx<T> {
@@ -28,30 +29,38 @@ impl<T> Rx<T> {
     }
 
     #[inline(always)]
-    pub(crate) fn _try_recv(shared: &ChannelShared<T>) -> Option<T> {
-        if let Some(item) = shared.try_recv() {
-            shared.on_recv();
-            return Some(item);
-        }
-        None
-    }
-
-    #[inline(always)]
-    pub(crate) fn _recv_blocking(shared: &ChannelShared<T>) -> Result<T, RecvError> {
-        let waker = LockedWaker::new_blocking();
-        let mut init = true;
-        loop {
-            if let Some(item) = Self::_try_recv(shared) {
-                return Ok(item);
-            }
-            if shared.get_tx_count() == 0 {
-                return Err(RecvError);
-            }
-            if waker.is_waked() || init {
-                init = false;
-                shared.reg_recv_blocking(&waker);
-            } else {
-                std::thread::park();
+    pub(crate) fn _recv_blocking(
+        shared: &ChannelShared<T>, deadline: Option<Instant>,
+    ) -> Result<T, RecvTimeoutError> {
+        if shared.bound_size == Some(0) {
+            todo!();
+        } else {
+            let waker = LockedWaker::new_blocking();
+            debug_assert!(waker.is_waked());
+            loop {
+                let backoff = Backoff::new();
+                loop {
+                    if let Some(item) = shared.try_recv() {
+                        shared.on_recv();
+                        return Ok(item);
+                    }
+                    if backoff.is_completed() {
+                        break;
+                    }
+                    backoff.snooze();
+                }
+                if shared.get_tx_count() == 0 {
+                    return Err(RecvTimeoutError::Disconnected);
+                }
+                if waker.is_waked() {
+                    shared.reg_recv_blocking(&waker);
+                    if !shared.is_empty() {
+                        continue;
+                    }
+                }
+                if !wait_timeout(deadline) {
+                    return Err(RecvTimeoutError::Timeout);
+                }
             }
         }
     }
@@ -63,7 +72,10 @@ impl<T> Rx<T> {
     /// Returns Err([RecvError]) when all Tx dropped.
     #[inline]
     pub fn recv<'a>(&'a self) -> Result<T, RecvError> {
-        Self::_recv_blocking(&self.shared)
+        Self::_recv_blocking(&self.shared, None).map_err(|err| match err {
+            RecvTimeoutError::Disconnected => RecvError,
+            RecvTimeoutError::Timeout => unreachable!(),
+        })
     }
 
     /// Try to receive message, non-blocking.
@@ -75,15 +87,16 @@ impl<T> Rx<T> {
     /// returns Err([TryRecvError::Disconnected]) when all Tx dropped.
     #[inline]
     pub fn try_recv(&self) -> Result<T, TryRecvError> {
-        if self.shared.get_tx_count() == 0 {
-            return Err(TryRecvError::Disconnected);
-        }
-        match self.shared.try_recv() {
-            Some(i) => {
+        if self.shared.bound_size == Some(0) {
+            todo!();
+        } else {
+            if let Some(item) = self.shared.try_recv() {
                 self.shared.on_recv();
-                return Ok(i);
-            }
-            None => {
+                return Ok(item);
+            } else {
+                if self.shared.get_tx_count() == 0 {
+                    return Err(TryRecvError::Disconnected);
+                }
                 return Err(TryRecvError::Empty);
             }
         }
@@ -99,14 +112,13 @@ impl<T> Rx<T> {
     /// returns Err([RecvTimeoutError::Disconnected]) when all Tx dropped.
     #[inline]
     pub fn recv_timeout(&self, timeout: Duration) -> Result<T, RecvTimeoutError> {
-        todo!();
-        //        match self.recv.recv_timeout(timeout) {
-        //            Err(e) => return Err(e),
-        //            Ok(i) => {
-        //                self.shared.on_recv();
-        //                return Ok(i);
-        //            }
-        //        }
+        match Instant::now().checked_add(timeout) {
+            Some(deadline) => Self::_recv_blocking(&self.shared, Some(deadline)),
+            None => self.try_recv().map_err(|e| match e {
+                TryRecvError::Disconnected => RecvTimeoutError::Disconnected,
+                TryRecvError::Empty => RecvTimeoutError::Timeout,
+            }),
+        }
     }
 
     /// Probe possible messages in the channel (not accurate)

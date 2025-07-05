@@ -159,7 +159,10 @@ impl<T: Unpin + Send + 'static> AsyncTx<T> {
     /// **NOTE: Do not use it in async context otherwise will block the runtime.**
     #[inline]
     pub fn send_blocking(&self, item: T) -> Result<(), SendError<T>> {
-        Tx::_send_blocking(&self.shared, item)
+        Tx::_send_blocking(&self.shared, item, None).map_err(|err| match err {
+            SendTimeoutError::Disconnected(msg) => SendError(msg),
+            SendTimeoutError::Timeout(_) => unreachable!(),
+        })
     }
 
     /// Just for debugging purpose, to monitor queue size

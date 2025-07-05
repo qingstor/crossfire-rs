@@ -224,9 +224,11 @@ impl<T: Unpin + Send + 'static> Future for SendFuture<'_, T> {
         let tx = _self.tx;
         match tx.poll_send(ctx, &_self.item, &mut _self.waker) {
             Poll::Ready(Ok(())) => {
+                debug_assert!(_self.waker.is_none());
                 return Poll::Ready(Ok(()));
             }
             Poll::Ready(Err(())) => {
+                let _ = _self.waker.take();
                 return Poll::Ready(Err(SendError(unsafe { _self.item.assume_init_read() })));
             }
             Poll::Pending => return Poll::Pending,

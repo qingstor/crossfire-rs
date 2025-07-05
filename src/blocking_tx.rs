@@ -1,5 +1,4 @@
 use crate::channel::*;
-pub use crossbeam::channel::{SendError, SendTimeoutError, TrySendError};
 use std::fmt;
 use std::mem::MaybeUninit;
 use std::ops::{Deref, DerefMut};

@@ -1,5 +1,5 @@
 use crate::locked_waker::*;
-use crossbeam::queue::SegQueue;
+use crossbeam_queue::SegQueue;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::task::Context;
 

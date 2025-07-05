@@ -1,8 +1,7 @@
 use crate::blocking_tx::Tx;
 use crate::channel::*;
 use async_trait::async_trait;
-pub use crossbeam::channel::{SendError, TrySendError};
-use crossbeam::utils::Backoff;
+use crossbeam_utils::Backoff;
 use std::fmt;
 use std::future::Future;
 use std::mem::{needs_drop, MaybeUninit};

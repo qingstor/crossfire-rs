@@ -1,5 +1,4 @@
 use crate::channel::*;
-pub use crossbeam::channel::{RecvError, RecvTimeoutError, TryRecvError};
 use std::fmt;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;

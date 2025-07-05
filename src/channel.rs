@@ -2,6 +2,7 @@ pub use super::waker_registry::*;
 pub use crate::locked_waker::*;
 use crossbeam::queue::{ArrayQueue, SegQueue};
 use lazy_static::lazy_static;
+use std::mem;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::task::Context;
@@ -57,14 +58,19 @@ pub struct ChannelShared<T> {
 }
 
 impl<T: Send + 'static> ChannelShared<T> {
-    pub fn try_send(&self, item: T) -> Result<(), T> {
+    pub fn try_send(&self, item: &mem::MaybeUninit<T>) -> Result<(), ()> {
         match &self.inner {
             Channel::List(inner) => {
-                inner.push(item);
+                inner.push(unsafe { item.assume_init_read() });
                 return Ok(());
             }
             Channel::Array(inner) => {
-                return inner.push(item);
+                if let Err(t) = inner.push(unsafe { item.assume_init_read() }) {
+                    mem::forget(t);
+                    return Err(());
+                } else {
+                    return Ok(());
+                }
             }
         }
     }

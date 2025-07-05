@@ -1,6 +1,7 @@
 use crate::channel::*;
 pub use crossbeam::channel::{SendError, SendTimeoutError, TrySendError};
 use std::fmt;
+use std::mem::MaybeUninit;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use std::time::Duration;
@@ -25,9 +26,10 @@ impl<T> Drop for Tx<T> {
 impl<T: Send + 'static> Tx<T> {
     #[inline(always)]
     fn _try_send(shared: &ChannelShared<T>, item: T) -> Result<(), T> {
-        match shared.try_send(item) {
-            Err(item) => {
-                return Err(item);
+        let _item = MaybeUninit::new(item);
+        match shared.try_send(&_item) {
+            Err(()) => {
+                return Err(unsafe { _item.assume_init_read() });
             }
             Ok(_) => {
                 shared.on_send();
@@ -37,9 +39,7 @@ impl<T: Send + 'static> Tx<T> {
     }
 
     #[inline(always)]
-    pub(crate) fn _send_blocking(
-        shared: &ChannelShared<T>, mut item: T,
-    ) -> Result<(), SendError<T>> {
+    pub(crate) fn _send_blocking(shared: &ChannelShared<T>, item: T) -> Result<(), SendError<T>> {
         if shared.get_rx_count() == 0 {
             return Err(SendError(item));
         }
@@ -51,19 +51,20 @@ impl<T: Send + 'static> Tx<T> {
         } else {
             let waker = LockedWaker::new_blocking();
             let mut init = true;
+            let _item = MaybeUninit::new(item);
             loop {
-                if let Err(t) = Self::_try_send(shared, item) {
-                    if shared.get_rx_count() == 0 {
-                        return Err(SendError(t));
-                    }
-                    item = t;
+                if let Err(()) = shared.try_send(&_item) {
                     if waker.is_waked() || init {
                         init = false;
                         shared.reg_send_blocking(&waker);
                     } else {
+                        if shared.get_rx_count() == 0 {
+                            return Err(SendError(unsafe { _item.assume_init_read() }));
+                        }
                         std::thread::park();
                     }
                 } else {
+                    shared.on_send();
                     return Ok(());
                 }
             }

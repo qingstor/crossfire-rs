@@ -15,6 +15,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [2.0.2] - 2025-07-05
+
+### Added
+
+- Add channels for blocking context (which equals to crossbeam)
+
+### Changed
+
+- Remove unused Clone for LockedWaker
+
+### Fixed
+
+- spsc: Add missing unsupported size=0 overwrites
+
+
 ## [2.0.1] - 2025-07-03
 
 ### Added
